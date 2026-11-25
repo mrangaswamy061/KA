@@ -412,7 +412,22 @@ export function AdminDashboardClient({
     const data = await res.json();
     if (!res.ok) return showToast("err", data.error || "Upload failed.");
     setMediaItems([{ name: file.name, path: data.path, publicUrl: data.publicUrl }, ...mediaItems]);
-    showToast("ok", "Image uploaded to Supabase Storage.");
+    showToast("ok", "Image uploaded.");
+  }
+
+  async function uploadImageToField(
+    file: File,
+    folder: string,
+    onSuccess: (publicUrl: string) => void
+  ) {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("folder", folder);
+    const res = await fetch("/api/admin/media", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) return showToast("err", data.error || "Image upload failed.");
+    onSuccess(data.publicUrl);
+    showToast("ok", "Image uploaded.");
   }
 
   async function deleteMedia(path: string) {
@@ -664,13 +679,47 @@ export function AdminDashboardClient({
                     onChange={(e) => setNewAdv({ ...newAdv, difficulty: e.target.value })}
                     className="rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
                   />
-                  <input
-                    type="url"
-                    placeholder="Cover Image URL (from Media Library)"
-                    value={newAdv.cover_image_url}
-                    onChange={(e) => setNewAdv({ ...newAdv, cover_image_url: e.target.value })}
-                    className="sm:col-span-2 rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
-                  />
+                  <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Cover Image URL (or upload)"
+                      value={newAdv.cover_image_url}
+                      onChange={(e) => setNewAdv({ ...newAdv, cover_image_url: e.target.value })}
+                      className="flex-1 rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
+                    />
+                    <label className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-md border border-[#244B3C] px-3 py-2 text-xs font-semibold text-[#244B3C] hover:bg-[#244B3C] hover:text-[#FFFDF8] transition-colors shrink-0">
+                      <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                      Upload Cover
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          const folder =
+                            newAdv.category === "trek"
+                              ? "treks"
+                              : newAdv.category === "trip"
+                              ? "trips"
+                              : newAdv.category;
+                          if (file) {
+                            uploadImageToField(file, folder, (url) =>
+                              setNewAdv((prev) => ({ ...prev, cover_image_url: url }))
+                            );
+                          }
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {newAdv.cover_image_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={newAdv.cover_image_url}
+                        alt="Activity cover preview"
+                        className="h-9 w-14 rounded object-cover border border-[#E9E9E2] shrink-0"
+                      />
+                    )}
+                  </div>
                   <input
                     type="text"
                     placeholder="Short editorial summary"
@@ -828,7 +877,7 @@ export function AdminDashboardClient({
                     className="rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
                   />
                   <input
-                    type="url"
+                    type="text"
                     placeholder="Google Maps Link (optional)"
                     value={newEvent.map_url}
                     onChange={(e) => setNewEvent({ ...newEvent, map_url: e.target.value })}
@@ -836,10 +885,79 @@ export function AdminDashboardClient({
                   />
                   <input
                     type="text"
+                    placeholder="Start Time (e.g., 6:00 AM)"
+                    value={newEvent.start_time}
+                    onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
+                    className="rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
+                  />
+                  <select
+                    value={newEvent.adventure_id}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, adventure_id: e.target.value })
+                    }
+                    className="rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
+                  >
+                    <option value="">Link to Activity (optional)</option>
+                    {adventures.map((adv) => (
+                      <option key={adv.id} value={adv.id}>
+                        {adv.title} ({adv.category})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Cover Image URL (or upload)"
+                      value={newEvent.cover_image_url}
+                      onChange={(e) =>
+                        setNewEvent({ ...newEvent, cover_image_url: e.target.value })
+                      }
+                      className="flex-1 rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
+                    />
+                    <label className="cursor-pointer inline-flex items-center gap-1 rounded-md border border-[#244B3C] px-2.5 py-2 text-xs font-semibold text-[#244B3C] hover:bg-[#244B3C] hover:text-[#FFFDF8] shrink-0">
+                      <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          const folder =
+                            newEvent.category === "trek"
+                              ? "treks"
+                              : newEvent.category === "trip"
+                              ? "trips"
+                              : newEvent.category === "volunteer"
+                              ? "volunteers"
+                              : newEvent.category === "special"
+                              ? "general"
+                              : newEvent.category;
+                          if (file) {
+                            uploadImageToField(file, folder, (url) =>
+                              setNewEvent((prev) => ({ ...prev, cover_image_url: url }))
+                            );
+                          }
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <input
+                    type="text"
                     placeholder="Short description"
                     value={newEvent.short_description}
                     onChange={(e) =>
                       setNewEvent({ ...newEvent, short_description: e.target.value })
+                    }
+                    className="sm:col-span-3 rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
+                  />
+                  <textarea
+                    rows={3}
+                    placeholder="Full event details, reporting time, and instructions"
+                    value={newEvent.description}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, description: e.target.value })
                     }
                     className="sm:col-span-3 rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
                   />
@@ -1413,7 +1531,7 @@ export function AdminDashboardClient({
           {activeTab === "media" && (
             <div className="space-y-6">
               <h1 className="font-editorial text-3xl font-semibold text-[#18372D]">
-                Media Library (Supabase Storage)
+                Media Library
               </h1>
               <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-[#FFFDF8] border border-[#E9E9E2] p-5">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1514,11 +1632,11 @@ export function AdminDashboardClient({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#8C735A] mb-1">
-                    WhatsApp Business Number (with country code)
+                    WhatsApp Number or URL
                   </label>
                   <input
                     type="text"
-                    placeholder="919876543210"
+                    placeholder="https://wa.me/... or 917760013106"
                     value={settings.whatsapp_number}
                     onChange={(e) =>
                       setSettings({ ...settings, whatsapp_number: e.target.value })
@@ -1528,10 +1646,10 @@ export function AdminDashboardClient({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#8C735A] mb-1">
-                    Contact Email
+                    Contact Email / Website
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     value={settings.contact_email}
                     onChange={(e) =>
                       setSettings({ ...settings, contact_email: e.target.value })

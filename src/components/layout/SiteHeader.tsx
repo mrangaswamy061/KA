@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Menu, X, Mountain } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Menu, X, Mountain, ChevronDown } from "lucide-react";
 import type { WebsiteSettings } from "@/types/database";
 
-const NAV_ITEMS = [
-  { label: "Treks", href: "/treks" },
+const TREK_SUB_ITEMS = [
+  { label: "All Treks", href: "/treks" },
   { label: "Trips", href: "/trips" },
   { label: "Camping", href: "/camping" },
   { label: "For Kids", href: "/kids" },
+];
+
+const NAV_ITEMS = [
   { label: "Collaborations", href: "/collaborations" },
   { label: "Volunteers Program", href: "/volunteers" },
 ];
@@ -20,6 +23,9 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
   const isHome = pathname === "/";
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [treksOpen, setTreksOpen] = useState(false);
+  const [mobileTreksOpen, setMobileTreksOpen] = useState(false);
+  const treksMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 36);
@@ -28,12 +34,55 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    function handleOutside(event: MouseEvent) {
+      if (
+        treksMenuRef.current &&
+        !treksMenuRef.current.contains(event.target as Node)
+      ) {
+        setTreksOpen(false);
+      }
+    }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setTreksOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
   // Hide public header on admin dashboard routes
   if (pathname?.startsWith("/admin")) {
     return null;
   }
 
   const transparentOverHero = isHome && !scrolled && !mobileOpen;
+  const isTreksSectionActive = TREK_SUB_ITEMS.some(
+    (sub) => pathname === sub.href || pathname?.startsWith(`${sub.href}/`)
+  );
+
+  const navLinkClass = (active: boolean) =>
+    `text-sm font-medium transition-colors relative py-1 ${
+      transparentOverHero
+        ? active
+          ? "text-[#FFFDF8]"
+          : "text-[#FFFDF8]/85 hover:text-[#FFFDF8]"
+        : active
+        ? "text-[#244B3C]"
+        : "text-[#262B27]/80 hover:text-[#244B3C]"
+    }`;
+
+  const activeUnderline = (
+    <span
+      aria-hidden="true"
+      className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-full ${
+        transparentOverHero ? "bg-[#FFFDF8]" : "bg-[#244B3C]"
+      }`}
+    />
+  );
 
   return (
     <header
@@ -88,6 +137,75 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
             aria-label="Main navigation"
             className="hidden lg:flex items-center gap-6"
           >
+            <Link href="/" className={navLinkClass(pathname === "/")}>
+              Home
+              {pathname === "/" && activeUnderline}
+            </Link>
+
+            {/* Treks Dropdown containing Trips, Camping, For Kids */}
+            <div
+              ref={treksMenuRef}
+              className="relative"
+              onMouseEnter={() => setTreksOpen(true)}
+              onMouseLeave={() => setTreksOpen(false)}
+            >
+              <div className="flex items-center gap-1">
+                <Link
+                  href="/treks"
+                  onClick={() => setTreksOpen(false)}
+                  className={navLinkClass(isTreksSectionActive)}
+                >
+                  Treks
+                  {isTreksSectionActive && activeUnderline}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setTreksOpen((prev) => !prev)}
+                  aria-expanded={treksOpen}
+                  aria-haspopup="true"
+                  aria-label="Toggle Treks sub-menu"
+                  className={`p-1 rounded transition-colors ${
+                    transparentOverHero
+                      ? "text-[#FFFDF8]/85 hover:text-[#FFFDF8]"
+                      : "text-[#262B27]/80 hover:text-[#244B3C]"
+                  }`}
+                >
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform ${
+                      treksOpen ? "rotate-180" : ""
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+
+              {treksOpen && (
+                <div className="absolute left-0 top-full pt-2 w-48 z-50">
+                  <div className="rounded-lg border border-[#E9E9E2] bg-[#FFFDF8] py-1.5 shadow-lg text-[#262B27]">
+                    {TREK_SUB_ITEMS.map((sub) => {
+                      const subActive =
+                        pathname === sub.href ||
+                        pathname?.startsWith(`${sub.href}/`);
+                      return (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          onClick={() => setTreksOpen(false)}
+                          className={`block px-4 py-2 text-sm font-medium transition-colors ${
+                            subActive
+                              ? "bg-[#244B3C] text-[#FFFDF8]"
+                              : "hover:bg-[#F6F4ED] hover:text-[#244B3C]"
+                          }`}
+                        >
+                          {sub.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {NAV_ITEMS.map((item) => {
               const active =
                 pathname === item.href || pathname?.startsWith(`${item.href}/`);
@@ -95,25 +213,10 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`text-sm font-medium transition-colors relative py-1 ${
-                    transparentOverHero
-                      ? active
-                        ? "text-[#FFFDF8]"
-                        : "text-[#FFFDF8]/85 hover:text-[#FFFDF8]"
-                      : active
-                      ? "text-[#244B3C]"
-                      : "text-[#262B27]/80 hover:text-[#244B3C]"
-                  }`}
+                  className={navLinkClass(active)}
                 >
                   {item.label}
-                  {active && (
-                    <span
-                      aria-hidden="true"
-                      className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-full ${
-                        transparentOverHero ? "bg-[#FFFDF8]" : "bg-[#244B3C]"
-                      }`}
-                    />
-                  )}
+                  {active && activeUnderline}
                 </Link>
               );
             })}
@@ -164,6 +267,71 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
           className="lg:hidden bg-[#F6F4ED] text-[#262B27] border-t border-[#E9E9E2] px-4 py-6 space-y-4"
         >
           <nav aria-label="Mobile navigation" className="flex flex-col space-y-2">
+            <Link
+              href="/"
+              onClick={() => setMobileOpen(false)}
+              className={`rounded-md px-3 py-2.5 text-base font-medium transition-colors ${
+                pathname === "/"
+                  ? "bg-[#244B3C] text-[#FFFDF8]"
+                  : "text-[#262B27] hover:bg-[#E9E9E2]/60"
+              }`}
+            >
+              Home
+            </Link>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between rounded-md hover:bg-[#E9E9E2]/60">
+                <Link
+                  href="/treks"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex-1 rounded-md px-3 py-2.5 text-base font-medium transition-colors ${
+                    isTreksSectionActive
+                      ? "text-[#244B3C] font-semibold"
+                      : "text-[#262B27]"
+                  }`}
+                >
+                  Treks
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setMobileTreksOpen((prev) => !prev)}
+                  aria-expanded={mobileTreksOpen}
+                  aria-label="Toggle Treks sub-menu"
+                  className="px-3 py-2.5 text-[#262B27]"
+                >
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      mobileTreksOpen ? "rotate-180" : ""
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+              {mobileTreksOpen && (
+                <div className="pl-4 space-y-1 border-l border-[#E9E9E2] ml-3">
+                  {TREK_SUB_ITEMS.map((sub) => {
+                    const subActive =
+                      pathname === sub.href ||
+                      pathname?.startsWith(`${sub.href}/`);
+                    return (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        onClick={() => setMobileOpen(false)}
+                        className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                          subActive
+                            ? "bg-[#244B3C] text-[#FFFDF8]"
+                            : "text-[#262B27]/85 hover:bg-[#E9E9E2]/60"
+                        }`}
+                      >
+                        {sub.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {NAV_ITEMS.map((item) => {
               const active =
                 pathname === item.href || pathname?.startsWith(`${item.href}/`);

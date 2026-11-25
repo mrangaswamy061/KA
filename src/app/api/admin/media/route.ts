@@ -3,8 +3,10 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { getAuthenticatedStaffProfile } from "@/lib/services/admin-auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { readLocalDb, writeLocalDb } from "@/lib/db/local-store";
 
 const BUCKET = "kaggadu-media";
+const MAX_INLINE_BYTES = 2.5 * 1024 * 1024;
 const ALLOWED_FOLDERS = [
   "logo",
   "treks",
@@ -20,6 +22,20 @@ function getLocalFolderDir(folder: string): string {
   return path.join(process.cwd(), "public", "uploads", folder);
 }
 
+function canWritePublicUploads(): boolean {
+  if (process.env.VERCEL || process.env.VERCEL_ENV) {
+    return false;
+  }
+  try {
+    const uploadsRoot = path.join(process.cwd(), "public", "uploads");
+    fs.mkdirSync(uploadsRoot, { recursive: true });
+    fs.accessSync(uploadsRoot, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: Request) {
   const staff = await getAuthenticatedStaffProfile();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -30,16 +46,21 @@ export async function GET(request: Request) {
 
   const supabase = createAdminSupabaseClient();
   if (!supabase) {
+    const db = readLocalDb();
+    const inlineItems = (db.media_items || [])
+      .filter((m) => m.folder === safeFolder)
+      .map((m) => ({ name: m.name, path: m.path, publicUrl: m.publicUrl }));
+
     const dir = getLocalFolderDir(safeFolder);
-    if (!fs.existsSync(dir)) return NextResponse.json({ items: [] });
-    const files = fs.readdirSync(dir);
-    return NextResponse.json({
-      items: files.map((name) => ({
-        name,
-        path: `${safeFolder}/${name}`,
-        publicUrl: `/uploads/${safeFolder}/${name}`,
-      })),
-    });
+    const diskItems = fs.existsSync(dir)
+      ? fs.readdirSync(dir).map((name) => ({
+          name,
+          path: `${safeFolder}/${name}`,
+          publicUrl: `/uploads/${safeFolder}/${name}`,
+        }))
+      : [];
+
+    return NextResponse.json({ items: [...inlineItems, ...diskItems] });
   }
 
   const { data, error } = await supabase.storage.from(BUCKET).list(safeFolder, {
@@ -82,13 +103,39 @@ export async function POST(request: Request) {
 
   const supabase = createAdminSupabaseClient();
   if (!supabase) {
-    const dir = getLocalFolderDir(safeFolder);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, safeName), buffer);
-    return NextResponse.json(
-      { path: filePath, publicUrl: `/uploads/${filePath}` },
-      { status: 201 }
-    );
+    if (canWritePublicUploads()) {
+      const dir = getLocalFolderDir(safeFolder);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, safeName), buffer);
+      return NextResponse.json(
+        { path: filePath, publicUrl: `/uploads/${filePath}` },
+        { status: 201 }
+      );
+    }
+
+    if (buffer.length > MAX_INLINE_BYTES) {
+      return NextResponse.json(
+        { error: "Image must be 2.5 MB or smaller without Supabase Storage." },
+        { status: 400 }
+      );
+    }
+
+    const mimeType = file.type || "image/jpeg";
+    const publicUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
+    const inlinePath = `inline/${filePath}`;
+    const db = readLocalDb();
+    db.media_items = [
+      {
+        name: file.name || safeName,
+        path: inlinePath,
+        publicUrl,
+        folder: safeFolder,
+        created_at: new Date().toISOString(),
+      },
+      ...(db.media_items || []),
+    ];
+    writeLocalDb(db);
+    return NextResponse.json({ path: inlinePath, publicUrl }, { status: 201 });
   }
 
   const { error } = await supabase.storage.from(BUCKET).upload(filePath, buffer, {
@@ -115,6 +162,13 @@ export async function DELETE(request: Request) {
 
   const supabase = createAdminSupabaseClient();
   if (!supabase) {
+    if (targetPath.startsWith("inline/")) {
+      const db = readLocalDb();
+      db.media_items = (db.media_items || []).filter((m) => m.path !== targetPath);
+      writeLocalDb(db);
+      return NextResponse.json({ success: true });
+    }
+
     const safeResolved = path.resolve(process.cwd(), "public", "uploads", targetPath);
     const baseUploads = path.resolve(process.cwd(), "public", "uploads");
     if (!safeResolved.startsWith(baseUploads)) {

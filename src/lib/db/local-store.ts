@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import type {
@@ -12,6 +13,15 @@ import type {
   VolunteerRegistration,
   WebsiteSettings,
 } from "@/types/database";
+import { SEED_ADVENTURES, SEED_EVENTS } from "./seed-data";
+
+export interface LocalMediaItem {
+  name: string;
+  path: string;
+  publicUrl: string;
+  folder: string;
+  created_at: string;
+}
 
 export interface LocalDatabase {
   adventures: Adventure[];
@@ -23,10 +33,33 @@ export interface LocalDatabase {
   enquiries: Enquiry[];
   collaboration_enquiries: CollaborationEnquiry[];
   website_settings: WebsiteSettings;
+  media_items?: LocalMediaItem[];
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "kaggadu-db.json");
+const SEED_DIR = path.join(process.cwd(), "data");
+const SEED_DB_PATH = path.join(SEED_DIR, "kaggadu-db.json");
+const TMP_DB_PATH = path.join(os.tmpdir(), "kaggadu-db.json");
+
+const globalCache = globalThis as typeof globalThis & {
+  __kaggaduLocalDb?: LocalDatabase;
+};
+
+function isReadOnlyEnvironment(): boolean {
+  if (process.env.VERCEL || process.env.VERCEL_ENV) {
+    return true;
+  }
+  try {
+    fs.mkdirSync(SEED_DIR, { recursive: true });
+    fs.accessSync(SEED_DIR, fs.constants.W_OK);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function getActiveDbPath(): string {
+  return isReadOnlyEnvironment() ? TMP_DB_PATH : SEED_DB_PATH;
+}
 
 function createDefaultSettings(): WebsiteSettings {
   return {
@@ -64,8 +97,8 @@ function createDefaultSettings(): WebsiteSettings {
 
 function createInitialDb(): LocalDatabase {
   return {
-    adventures: [],
-    events: [],
+    adventures: SEED_ADVENTURES,
+    events: SEED_EVENTS,
     event_images: [],
     trek_leaders: [],
     registrations: [],
@@ -73,37 +106,70 @@ function createInitialDb(): LocalDatabase {
     enquiries: [],
     collaboration_enquiries: [],
     website_settings: createDefaultSettings(),
+    media_items: [],
+  };
+}
+
+function normalizeDb(parsed: Partial<LocalDatabase>): LocalDatabase {
+  return {
+    ...createInitialDb(),
+    ...parsed,
+    media_items: Array.isArray(parsed.media_items) ? parsed.media_items : [],
+    website_settings: {
+      ...createDefaultSettings(),
+      ...(parsed.website_settings || {}),
+    },
   };
 }
 
 export function readLocalDb(): LocalDatabase {
+  const activePath = getActiveDbPath();
   try {
-    if (!fs.existsSync(DB_PATH)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-      const initial = createInitialDb();
-      fs.writeFileSync(DB_PATH, JSON.stringify(initial, null, 2), "utf8");
-      return initial;
+    if (fs.existsSync(activePath)) {
+      const raw = fs.readFileSync(activePath, "utf8");
+      const db = normalizeDb(JSON.parse(raw) as Partial<LocalDatabase>);
+      globalCache.__kaggaduLocalDb = db;
+      return db;
     }
-    const raw = fs.readFileSync(DB_PATH, "utf8");
-    const parsed = JSON.parse(raw) as Partial<LocalDatabase>;
-    return {
-      ...createInitialDb(),
-      ...parsed,
-      website_settings: {
-        ...createDefaultSettings(),
-        ...(parsed.website_settings || {}),
-      },
-    };
+
+    if (activePath !== SEED_DB_PATH && fs.existsSync(SEED_DB_PATH)) {
+      const seedRaw = fs.readFileSync(SEED_DB_PATH, "utf8");
+      const db = normalizeDb(JSON.parse(seedRaw) as Partial<LocalDatabase>);
+      try {
+        fs.writeFileSync(activePath, JSON.stringify(db, null, 2), "utf8");
+      } catch {
+        // Ignore write error in read path; in-memory cache still holds data.
+      }
+      globalCache.__kaggaduLocalDb = db;
+      return db;
+    }
+
+    if (globalCache.__kaggaduLocalDb) {
+      return globalCache.__kaggaduLocalDb;
+    }
+
+    const initial = createInitialDb();
+    try {
+      fs.mkdirSync(path.dirname(activePath), { recursive: true });
+      fs.writeFileSync(activePath, JSON.stringify(initial, null, 2), "utf8");
+    } catch {
+      // Ignore write error in read path.
+    }
+    globalCache.__kaggaduLocalDb = initial;
+    return initial;
   } catch {
-    return createInitialDb();
+    return globalCache.__kaggaduLocalDb || createInitialDb();
   }
 }
 
 export function writeLocalDb(db: LocalDatabase): void {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const tmpPath = `${DB_PATH}.tmp`;
+  globalCache.__kaggaduLocalDb = db;
+  const activePath = getActiveDbPath();
+  const dir = path.dirname(activePath);
+  fs.mkdirSync(dir, { recursive: true });
+  const tmpPath = `${activePath}.${process.pid}.tmp`;
   fs.writeFileSync(tmpPath, JSON.stringify(db, null, 2), "utf8");
-  fs.renameSync(tmpPath, DB_PATH);
+  fs.renameSync(tmpPath, activePath);
 }
 
 export function newUuid(): string {
