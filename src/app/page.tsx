@@ -6,7 +6,10 @@ import {
   Calendar,
   Sparkles,
   Star,
+  MessageCircle,
+  Phone,
 } from "lucide-react";
+import { buildWhatsAppEnquiryUrl } from "@/lib/whatsapp/links";
 import {
   getPublishedEvents,
   getPublishedTrekLeaders,
@@ -62,6 +65,9 @@ export default async function HomePage() {
     getPublishedEvents({ category: "volunteer", limit: 3 }),
     getPublishedTrekLeaders(),
   ]);
+  const whatsappUrl = buildWhatsAppEnquiryUrl({
+    whatsappNumber: settings.whatsapp_number,
+  });
 
   return (
     <div className="flex flex-col">
@@ -470,6 +476,26 @@ export default async function HomePage() {
             >
               Contact Us
             </Link>
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-md border border-[#A8B8A0]/60 bg-[#18372D] px-6 py-3.5 text-sm font-semibold text-[#FFFDF8] hover:bg-[#18372D]/80 transition-colors"
+              >
+                <MessageCircle className="h-4 w-4 text-[#A8B8A0]" aria-hidden="true" />
+                Enquire on WhatsApp
+              </a>
+            )}
+            {settings.contact_phone && (
+              <a
+                href={`tel:${settings.contact_phone}`}
+                className="inline-flex items-center gap-2 rounded-md border border-[#FFFDF8]/40 px-5 py-3.5 text-sm font-semibold text-[#FFFDF8] hover:bg-[#FFFDF8]/10 transition-colors"
+              >
+                <Phone className="h-4 w-4 text-[#A8B8A0]" aria-hidden="true" />
+                Call {settings.contact_phone}
+              </a>
+            )}
           </div>
         </div>
       </section>

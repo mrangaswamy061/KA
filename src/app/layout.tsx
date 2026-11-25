@@ -5,6 +5,7 @@ import "./globals.css";
 import { getWebsiteSettings } from "@/lib/services/public-data";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { ConditionalFooter } from "@/components/layout/ConditionalFooter";
+import { FloatingWhatsAppCta } from "@/components/ui/FloatingWhatsAppCta";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -70,6 +71,7 @@ export default async function RootLayout({
         <SiteHeader settings={settings} />
         <main className="flex-1">{children}</main>
         <ConditionalFooter settings={settings} />
+        <FloatingWhatsAppCta whatsappNumber={settings.whatsapp_number} />
       </body>
     </html>
   );
