@@ -2,13 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  Compass,
-  Heart,
-  Leaf,
   MapPin,
   Calendar,
-  Users,
   Sparkles,
+  Star,
 } from "lucide-react";
 import {
   getPublishedEvents,
@@ -55,29 +52,6 @@ const ADVENTURE_CATEGORIES = [
     href: "/kids",
     image: "/images/category-kids.jpg",
     alt: "Children exploring a forest stream with a nature guide",
-  },
-];
-
-const BRAND_VALUES = [
-  {
-    icon: Compass,
-    title: "Explore",
-    description: "Discover new destinations across the Western Ghats and beyond.",
-  },
-  {
-    icon: Leaf,
-    title: "Experience",
-    description: "Connect deeply with forests, peaks, streams, and living trails.",
-  },
-  {
-    icon: Users,
-    title: "Community",
-    description: "Meet like-minded explorers who value responsible outdoor travel.",
-  },
-  {
-    icon: Heart,
-    title: "Memories",
-    description: "Make every journey meaningful with stories that stay with you.",
   },
 ];
 
@@ -441,38 +415,34 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* SECTION 07 — BRAND EXPERIENCE */}
-      <section className="py-20 sm:py-28 bg-[#FFFDF8] border-t border-[#E9E9E2]">
-        <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 space-y-12">
-          <div className="max-w-2xl space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8C735A]">
-              Our Philosophy
-            </p>
-            <h2 className="font-editorial text-3xl sm:text-5xl font-semibold text-[#18372D]">
-              MORE THAN JUST AN ADVENTURE.
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {BRAND_VALUES.map((val) => {
-              const Icon = val.icon;
-              return (
-                <div
-                  key={val.title}
-                  className="rounded-xl bg-[#F6F4ED] border border-[#E9E9E2] p-6 space-y-4"
-                >
-                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#244B3C] text-[#FFFDF8]">
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                  </div>
-                  <h3 className="font-editorial text-xl font-semibold text-[#18372D]">
-                    {val.title}
-                  </h3>
-                  <p className="text-sm text-[#262B27]/80 leading-relaxed">
-                    {val.description}
-                  </p>
-                </div>
-              );
-            })}
+      {/* SECTION 07 — GOOGLE REVIEW */}
+      <section className="py-16 sm:py-20 bg-[#FFFDF8] border-t border-[#E9E9E2]">
+        <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+          <div className="rounded-xl bg-[#F6F4ED] border border-[#E9E9E2] p-8 sm:p-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2 max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8C735A] inline-flex items-center gap-1.5">
+                <Star className="h-3.5 w-3.5 text-[#8C735A]" aria-hidden="true" />
+                Community Feedback
+              </p>
+              <h2 className="font-editorial text-2xl sm:text-4xl font-semibold text-[#18372D]">
+                Share Your Kaggadu Experience.
+              </h2>
+              <p className="text-sm sm:text-base text-[#262B27]/80">
+                Trekked, camped, or volunteered with us? Your review helps fellow nature lovers discover Kaggadu Adventures.
+              </p>
+            </div>
+            <a
+              href={
+                settings.google_review_url ||
+                "https://g.page/r/Cbm5xxD4yuq-EAE/review"
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-[#244B3C] px-6 py-3.5 text-sm font-semibold text-[#FFFDF8] hover:bg-[#18372D] transition-colors shrink-0"
+            >
+              <Star className="h-4 w-4" aria-hidden="true" />
+              Leave a Google Review
+            </a>
           </div>
         </div>
       </section>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Mountain, Mail, Phone, ExternalLink, MessageCircle } from "lucide-react";
+import { Mountain, Mail, Phone, ExternalLink, MessageCircle, Star } from "lucide-react";
 import type { WebsiteSettings } from "@/types/database";
 import { buildWhatsAppEnquiryUrl } from "@/lib/whatsapp/links";
 
@@ -127,14 +127,31 @@ export function SiteFooter({ settings }: { settings: WebsiteSettings }) {
                     className="inline-flex items-center gap-2 hover:text-[#FFFDF8] transition-colors"
                   >
                     <Phone className="h-4 w-4 text-[#A8B8A0]" aria-hidden="true" />
-                    <span>{settings.contact_phone}</span>
+                    <span>Primary: {settings.contact_phone}</span>
+                  </a>
+                </li>
+              )}
+              {settings.secondary_phone && (
+                <li>
+                  <a
+                    href={`tel:${settings.secondary_phone}`}
+                    className="inline-flex items-center gap-2 hover:text-[#FFFDF8] transition-colors"
+                  >
+                    <Phone className="h-4 w-4 text-[#A8B8A0]" aria-hidden="true" />
+                    <span>Secondary: {settings.secondary_phone}</span>
                   </a>
                 </li>
               )}
               {settings.contact_email && (
                 <li>
                   <a
-                    href={`mailto:${settings.contact_email}`}
+                    href={
+                      settings.contact_email.includes("@")
+                        ? `mailto:${settings.contact_email}`
+                        : `https://${settings.contact_email.replace(/^https?:\/\//, "")}`
+                    }
+                    target={settings.contact_email.includes("@") ? undefined : "_blank"}
+                    rel={settings.contact_email.includes("@") ? undefined : "noopener noreferrer"}
                     className="inline-flex items-center gap-2 hover:text-[#FFFDF8] transition-colors"
                   >
                     <Mail className="h-4 w-4 text-[#A8B8A0]" aria-hidden="true" />
@@ -152,6 +169,19 @@ export function SiteFooter({ settings }: { settings: WebsiteSettings }) {
                   >
                     <ExternalLink className="h-4 w-4 text-[#A8B8A0]" aria-hidden="true" />
                     <span>Instagram</span>
+                  </a>
+                </li>
+              )}
+              {settings.google_review_url && (
+                <li>
+                  <a
+                    href={settings.google_review_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 hover:text-[#FFFDF8] transition-colors"
+                  >
+                    <Star className="h-4 w-4 text-[#A8B8A0]" aria-hidden="true" />
+                    <span>Google Review</span>
                   </a>
                 </li>
               )}

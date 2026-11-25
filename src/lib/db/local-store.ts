@@ -35,10 +35,15 @@ function createDefaultSettings(): WebsiteSettings {
     tagline: "LIVE WITH NATURE",
     supporting_tagline: "Explore | Experience | Create Memories",
     logo_url: null,
-    contact_email: "",
-    contact_phone: "",
-    whatsapp_number: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "",
-    instagram_url: "",
+    contact_email: "kaggadu.com",
+    contact_phone: "7760013106",
+    secondary_phone: "8310668859",
+    whatsapp_number:
+      process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ||
+      "https://wa.me/message/2RLALIQ3GCUQM1",
+    instagram_url:
+      "https://www.instagram.com/kaggadu_adventures?utm_source=ig_web_button_share_sheet&knvt=ZDNlZDc0MzIxNw==",
+    google_review_url: "https://g.page/r/Cbm5xxD4yuq-EAE/review",
     office_location: "Western Ghats, Karnataka, India",
     hero_title: "LIVE WITH NATURE.",
     hero_subtitle:

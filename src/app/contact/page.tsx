@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Mail, Phone, MapPin, ExternalLink } from "lucide-react";
+import { Mail, Phone, MapPin, ExternalLink, Star } from "lucide-react";
 import { getWebsiteSettings } from "@/lib/services/public-data";
 import { ContactEnquiryForm } from "@/components/forms/EnquiryForms";
 import { WhatsAppButton } from "@/components/ui/WhatsAppButton";
@@ -46,14 +46,31 @@ export default async function ContactPage() {
                   <li className="flex items-center gap-3">
                     <Phone className="h-4 w-4 text-[#8C735A]" aria-hidden="true" />
                     <a href={`tel:${settings.contact_phone}`} className="hover:underline">
-                      {settings.contact_phone}
+                      Primary: {settings.contact_phone}
+                    </a>
+                  </li>
+                )}
+                {settings.secondary_phone && (
+                  <li className="flex items-center gap-3">
+                    <Phone className="h-4 w-4 text-[#8C735A]" aria-hidden="true" />
+                    <a href={`tel:${settings.secondary_phone}`} className="hover:underline">
+                      Secondary: {settings.secondary_phone}
                     </a>
                   </li>
                 )}
                 {settings.contact_email && (
                   <li className="flex items-center gap-3">
                     <Mail className="h-4 w-4 text-[#8C735A]" aria-hidden="true" />
-                    <a href={`mailto:${settings.contact_email}`} className="hover:underline">
+                    <a
+                      href={
+                        settings.contact_email.includes("@")
+                          ? `mailto:${settings.contact_email}`
+                          : `https://${settings.contact_email.replace(/^https?:\/\//, "")}`
+                      }
+                      target={settings.contact_email.includes("@") ? undefined : "_blank"}
+                      rel={settings.contact_email.includes("@") ? undefined : "noopener noreferrer"}
+                      className="hover:underline"
+                    >
                       {settings.contact_email}
                     </a>
                   </li>
@@ -68,6 +85,19 @@ export default async function ContactPage() {
                       className="hover:underline"
                     >
                       Instagram
+                    </a>
+                  </li>
+                )}
+                {settings.google_review_url && (
+                  <li className="flex items-center gap-3">
+                    <Star className="h-4 w-4 text-[#8C735A]" aria-hidden="true" />
+                    <a
+                      href={settings.google_review_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                    >
+                      Leave a Google Review
                     </a>
                   </li>
                 )}

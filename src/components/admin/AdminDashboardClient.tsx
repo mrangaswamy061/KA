@@ -1458,13 +1458,26 @@ export function AdminDashboardClient({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#8C735A] mb-1">
-                    Contact Phone
+                    Primary Contact Phone
                   </label>
                   <input
                     type="text"
                     value={settings.contact_phone}
                     onChange={(e) =>
                       setSettings({ ...settings, contact_phone: e.target.value })
+                    }
+                    className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#8C735A] mb-1">
+                    Secondary Contact Phone
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.secondary_phone}
+                    onChange={(e) =>
+                      setSettings({ ...settings, secondary_phone: e.target.value })
                     }
                     className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
                   />
@@ -1478,6 +1491,19 @@ export function AdminDashboardClient({
                     value={settings.instagram_url}
                     onChange={(e) =>
                       setSettings({ ...settings, instagram_url: e.target.value })
+                    }
+                    className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#8C735A] mb-1">
+                    Google Review URL
+                  </label>
+                  <input
+                    type="url"
+                    value={settings.google_review_url}
+                    onChange={(e) =>
+                      setSettings({ ...settings, google_review_url: e.target.value })
                     }
                     className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
                   />

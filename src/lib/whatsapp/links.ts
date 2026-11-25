@@ -7,23 +7,36 @@ export interface WhatsAppEnquiryParams {
   customMessage?: string;
 }
 
+const DEFAULT_WHATSAPP_LINK = "https://wa.me/message/2RLALIQ3GCUQM1";
+
 /**
  * Formats a WhatsApp number for wa.me links (digits only).
- * Falls back to NEXT_PUBLIC_WHATSAPP_NUMBER if not passed from website_settings.
  */
 export function sanitizeWhatsAppNumber(raw?: string | null): string {
   const source = raw?.trim() || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "";
+  if (source.startsWith("http://") || source.startsWith("https://")) {
+    return "";
+  }
   return source.replace(/\D/g, "");
 }
 
 /**
- * Builds a WhatsApp click-to-chat URL with a prefilled enquiry message.
- * Note: Click-to-chat does not create a database registration; the visitor must send the message.
+ * Builds a WhatsApp click-to-chat URL.
+ * Supports both full wa.me/message/... links and phone numbers with prefilled messages.
  */
 export function buildWhatsAppEnquiryUrl(params: WhatsAppEnquiryParams): string | null {
-  const cleanNumber = sanitizeWhatsAppNumber(params.whatsappNumber);
+  const raw =
+    params.whatsappNumber?.trim() ||
+    process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.trim() ||
+    DEFAULT_WHATSAPP_LINK;
+
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw;
+  }
+
+  const cleanNumber = raw.replace(/\D/g, "");
   if (!cleanNumber) {
-    return null;
+    return DEFAULT_WHATSAPP_LINK;
   }
 
   let message: string;

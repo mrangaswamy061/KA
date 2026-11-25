@@ -195,8 +195,10 @@ export interface WebsiteSettings {
   logo_url: string | null;
   contact_email: string;
   contact_phone: string;
+  secondary_phone: string;
   whatsapp_number: string;
   instagram_url: string;
+  google_review_url: string;
   office_location: string;
   hero_title: string;
   hero_subtitle: string;
