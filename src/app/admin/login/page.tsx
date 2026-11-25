@@ -14,7 +14,7 @@ function AdminLoginForm() {
   const configured = isSupabaseConfigured();
 
   const [email, setEmail] = useState(
-    configured ? "" : "admin@kaggaduadventures.com"
+    configured ? "" : "MAHABALA@2020"
   );
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "forgot">("login");
@@ -128,8 +128,10 @@ function AdminLoginForm() {
                 <p className="font-semibold">Local Persistent Mode Active</p>
                 <p className="mt-0.5 text-[#262B27]/80">
                   Supabase is not configured yet, so data persists locally in{" "}
-                  <code>data/kaggadu-db.json</code>. Default local password:{" "}
-                  <code>Kaggadu@2026</code> (override via <code>LOCAL_ADMIN_PASSWORD</code>).
+                  <code>data/kaggadu-db.json</code>. Sign in with your configured
+                  local admin ID and password (override via{" "}
+                  <code>LOCAL_ADMIN_EMAIL</code> and{" "}
+                  <code>LOCAL_ADMIN_PASSWORD</code>).
                 </p>
               </div>
             </div>
@@ -161,15 +163,15 @@ function AdminLoginForm() {
           >
             <div>
               <label htmlFor="admin-email" className="block text-sm font-medium text-[#18372D] mb-1">
-                Email Address
+                {configured ? "Email Address" : "Admin ID / Email"}
               </label>
               <input
                 id="admin-email"
-                type="email"
+                type={configured ? "email" : "text"}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@kaggaduadventures.com"
+                placeholder={configured ? "admin@kaggaduadventures.com" : "MAHABALA@2020"}
                 className="w-full rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3.5 py-2.5 text-sm text-[#262B27] focus:border-[#244B3C] focus:outline-none"
               />
             </div>

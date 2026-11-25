@@ -12,11 +12,11 @@ function getSecret(): string {
 }
 
 export function getLocalAdminEmail(): string {
-  return process.env.LOCAL_ADMIN_EMAIL || "admin@kaggaduadventures.com";
+  return process.env.LOCAL_ADMIN_EMAIL || "MAHABALA@2020";
 }
 
 function getLocalAdminPassword(): string {
-  return process.env.LOCAL_ADMIN_PASSWORD || "Kaggadu@2026";
+  return process.env.LOCAL_ADMIN_PASSWORD || "KAGGADU TREKKING";
 }
 
 export function verifyLocalAdminCredentials(

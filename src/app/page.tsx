@@ -112,6 +112,17 @@ export default async function HomePage() {
               >
                 UPCOMING EVENTS
               </a>
+              {whatsappUrl && (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-md border border-[#A8B8A0]/70 bg-[#244B3C]/80 px-6 py-3.5 text-sm font-semibold text-[#FFFDF8] hover:bg-[#244B3C] transition-colors"
+                >
+                  <MessageCircle className="h-4 w-4 text-[#A8B8A0]" aria-hidden="true" />
+                  WHATSAPP US
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -494,6 +505,15 @@ export default async function HomePage() {
               >
                 <Phone className="h-4 w-4 text-[#A8B8A0]" aria-hidden="true" />
                 Call {settings.contact_phone}
+              </a>
+            )}
+            {settings.secondary_phone && (
+              <a
+                href={`tel:${settings.secondary_phone}`}
+                className="inline-flex items-center gap-2 rounded-md border border-[#FFFDF8]/40 px-5 py-3.5 text-sm font-semibold text-[#FFFDF8] hover:bg-[#FFFDF8]/10 transition-colors"
+              >
+                <Phone className="h-4 w-4 text-[#A8B8A0]" aria-hidden="true" />
+                Call {settings.secondary_phone}
               </a>
             )}
           </div>

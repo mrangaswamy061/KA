@@ -315,6 +315,37 @@ export function AdminDashboardClient({
     showToast("ok", "Leader deleted.");
   }
 
+  async function uploadLeaderPhoto(file: File, leaderId?: string) {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("folder", "leaders");
+    const res = await fetch("/api/admin/media", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast("err", data.error || "Photo upload failed.");
+      return;
+    }
+
+    if (!leaderId) {
+      setNewLeader((prev) => ({ ...prev, avatar_url: data.publicUrl }));
+      showToast("ok", "Trek guide photo uploaded.");
+      return;
+    }
+
+    const patchRes = await fetch("/api/admin/trek-leaders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: leaderId, avatar_url: data.publicUrl }),
+    });
+    const patchData = await patchRes.json();
+    if (!patchRes.ok) {
+      showToast("err", patchData.error || "Failed to update leader photo.");
+      return;
+    }
+    setLeaders((prev) => prev.map((l) => (l.id === leaderId ? patchData.item : l)));
+    showToast("ok", "Trek guide photo updated.");
+  }
+
   // Registrations & Enquiries updates
   async function updateRegistrationStatus(
     id: string,
@@ -996,15 +1027,39 @@ export function AdminDashboardClient({
                     }
                     className="rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
                   />
-                  <input
-                    type="url"
-                    placeholder="Profile Photo URL"
-                    value={newLeader.avatar_url}
-                    onChange={(e) =>
-                      setNewLeader({ ...newLeader, avatar_url: e.target.value })
-                    }
-                    className="rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
-                  />
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Profile Photo URL (or upload)"
+                      value={newLeader.avatar_url}
+                      onChange={(e) =>
+                        setNewLeader({ ...newLeader, avatar_url: e.target.value })
+                      }
+                      className="flex-1 rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
+                    />
+                    <label className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-md border border-[#244B3C] px-3 py-2 text-xs font-semibold text-[#244B3C] hover:bg-[#244B3C] hover:text-[#FFFDF8] transition-colors shrink-0">
+                      <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                      Upload Photo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadLeaderPhoto(file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {newLeader.avatar_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={newLeader.avatar_url}
+                        alt="Trek guide preview"
+                        className="h-9 w-9 rounded-full object-cover border border-[#E9E9E2] shrink-0"
+                      />
+                    )}
+                  </div>
                   <textarea
                     rows={3}
                     placeholder="Biography"
@@ -1037,17 +1092,45 @@ export function AdminDashboardClient({
                 {leaders.map((leader) => (
                   <div
                     key={leader.id}
-                    className="rounded-xl bg-[#FFFDF8] border border-[#E9E9E2] p-4 flex items-center justify-between gap-4"
+                    className="rounded-xl bg-[#FFFDF8] border border-[#E9E9E2] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
-                    <div>
-                      <h3 className="font-editorial text-lg font-semibold text-[#18372D]">
-                        {leader.full_name}
-                      </h3>
-                      <p className="text-xs text-[#8C735A]">
-                        {leader.specialisation} • {leader.experience}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      {leader.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={leader.avatar_url}
+                          alt={leader.avatar_alt || leader.full_name}
+                          className="h-12 w-12 rounded-full object-cover border border-[#E9E9E2] shrink-0"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-full bg-[#A8B8A0]/25 text-[#244B3C] flex items-center justify-center text-xs font-semibold shrink-0">
+                          {leader.full_name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="font-editorial text-lg font-semibold text-[#18372D]">
+                          {leader.full_name}
+                        </h3>
+                        <p className="text-xs text-[#8C735A]">
+                          {leader.specialisation} • {leader.experience}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-[#E9E9E2] px-3 py-1.5 text-xs font-semibold text-[#244B3C] hover:border-[#244B3C] transition-colors">
+                        <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                        {leader.avatar_url ? "Change Photo" : "Add Photo"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) uploadLeaderPhoto(file, leader.id);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
                       <button
                         type="button"
                         onClick={() => toggleLeaderPublish(leader)}

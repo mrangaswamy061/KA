@@ -95,7 +95,7 @@ export function SiteFooter({ settings }: { settings: WebsiteSettings }) {
               </li>
               <li>
                 <Link href="/admin/login" className="hover:text-[#FFFDF8] transition-colors">
-                  Staff Portal
+                  Admin Login
                 </Link>
               </li>
             </ul>
@@ -211,6 +211,9 @@ export function SiteFooter({ settings }: { settings: WebsiteSettings }) {
             </Link>
             <Link href="/terms-and-conditions" className="hover:text-[#FFFDF8] transition-colors">
               Terms & Conditions
+            </Link>
+            <Link href="/admin/login" className="hover:text-[#FFFDF8] transition-colors">
+              Admin
             </Link>
           </div>
         </div>
