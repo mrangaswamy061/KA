@@ -212,7 +212,10 @@ export function SiteFooter({ settings }: { settings: WebsiteSettings }) {
             <Link href="/terms-and-conditions" className="hover:text-[#FFFDF8] transition-colors">
               Terms & Conditions
             </Link>
-            <Link href="/admin/login" className="hover:text-[#FFFDF8] transition-colors">
+            <Link
+              href="/admin/login"
+              className="inline-flex items-center justify-center rounded-md border border-[#A8B8A0]/50 bg-[#244B3C] px-3.5 py-1.5 text-xs font-semibold text-[#FFFDF8] hover:bg-[#FFFDF8] hover:text-[#18372D] transition-colors"
+            >
               Admin
             </Link>
           </div>
