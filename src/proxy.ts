@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const LOCAL_SESSION_COOKIE = "kaggadu_local_session";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
