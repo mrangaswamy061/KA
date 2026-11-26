@@ -357,27 +357,44 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* SECTION 06 — TREK LEADERS (Hidden if no profiles published per PRD 1.10) */}
-      {trekLeaders.length > 0 && (
-        <section className="py-20 sm:py-28 bg-[#F6F4ED]">
-          <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 space-y-12">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8C735A]">
-                  Experienced Guides
+      {/* SECTION 06 — TREK LEADERS */}
+      <section className="py-20 sm:py-28 bg-[#F6F4ED]">
+        <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 space-y-12">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8C735A]">
+                Experienced Guides
+              </p>
+              <h2 className="font-editorial text-3xl sm:text-5xl font-semibold text-[#18372D]">
+                THE PEOPLE BEHIND THE JOURNEY.
+              </h2>
+            </div>
+            <Link
+              href="/trek-leaders"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#244B3C] hover:underline"
+            >
+              All Trek Leaders <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+
+          {trekLeaders.length === 0 ? (
+            <div className="rounded-xl bg-[#FFFDF8] border border-[#E9E9E2] p-8 sm:p-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <h3 className="font-editorial text-2xl font-semibold text-[#18372D]">
+                  Meet Our Trek Leaders
+                </h3>
+                <p className="text-sm sm:text-base text-[#262B27]/80">
+                  Our treks and outdoor journeys are led by experienced Western Ghats guides trained in trail safety and nature interpretation.
                 </p>
-                <h2 className="font-editorial text-3xl sm:text-5xl font-semibold text-[#18372D]">
-                  THE PEOPLE BEHIND THE JOURNEY.
-                </h2>
               </div>
               <Link
                 href="/trek-leaders"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#244B3C] hover:underline"
+                className="inline-flex items-center gap-2 rounded-md bg-[#244B3C] px-5 py-2.5 text-sm font-semibold text-[#FFFDF8] hover:bg-[#18372D] transition-colors shrink-0"
               >
-                All Trek Leaders <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                View Trek Leaders <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
-
+          ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
               {trekLeaders.slice(0, 6).map((leader) => (
                 <article
@@ -428,9 +445,9 @@ export default async function HomePage() {
                 </article>
               ))}
             </div>
-          </div>
-        </section>
-      )}
+          )}
+        </div>
+      </section>
 
       {/* SECTION 07 — GOOGLE REVIEW */}
       <section className="py-16 sm:py-20 bg-[#FFFDF8] border-t border-[#E9E9E2]">

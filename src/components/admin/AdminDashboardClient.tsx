@@ -133,7 +133,7 @@ export function AdminDashboardClient({
     experience: "",
     bio: "",
     avatar_url: "",
-    is_published: false,
+    is_published: true,
   });
 
   // Media State
@@ -291,7 +291,7 @@ export function AdminDashboardClient({
       experience: "",
       bio: "",
       avatar_url: "",
-      is_published: false,
+      is_published: true,
     });
     showToast("ok", "Leader profile added.");
   }

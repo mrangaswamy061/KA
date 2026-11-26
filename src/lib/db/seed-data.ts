@@ -1,4 +1,21 @@
-import type { Adventure, EventRecord } from "@/types/database";
+import type { Adventure, EventRecord, TrekLeader } from "@/types/database";
+
+export const SEED_TREK_LEADERS: TrekLeader[] = [
+  {
+    id: "l1111111-1111-4111-8111-111111111101",
+    full_name: "Kaggadu Lead Guide",
+    slug: "kaggadu-lead-guide",
+    specialisation: "Western Ghats Expeditions & Trail Safety",
+    experience: "6+ years in Western Ghats",
+    bio: "Certified outdoor trek leaders guiding small-group mountain ridges, waterfall trails, and forest camps across Karnataka since 2020 with a focus on safety, local ecology, and memorable experiences.",
+    avatar_url: "/images/intro-trail.jpg",
+    avatar_alt: "Kaggadu Adventures trek leader on a misty Western Ghats trail",
+    is_published: true,
+    sort_order: 0,
+    created_at: "2026-11-25T10:00:00.000Z",
+    updated_at: "2026-11-25T10:00:00.000Z",
+  },
+];
 
 export const SEED_ADVENTURES: Adventure[] = [
   {

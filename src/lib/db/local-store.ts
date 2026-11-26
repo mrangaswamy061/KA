@@ -13,7 +13,7 @@ import type {
   VolunteerRegistration,
   WebsiteSettings,
 } from "@/types/database";
-import { SEED_ADVENTURES, SEED_EVENTS } from "./seed-data";
+import { SEED_ADVENTURES, SEED_EVENTS, SEED_TREK_LEADERS } from "./seed-data";
 
 export interface LocalMediaItem {
   name: string;
@@ -100,7 +100,7 @@ function createInitialDb(): LocalDatabase {
     adventures: SEED_ADVENTURES,
     events: SEED_EVENTS,
     event_images: [],
-    trek_leaders: [],
+    trek_leaders: SEED_TREK_LEADERS,
     registrations: [],
     volunteer_registrations: [],
     enquiries: [],

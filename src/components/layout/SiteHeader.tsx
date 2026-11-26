@@ -14,6 +14,7 @@ const TREK_SUB_ITEMS = [
 ];
 
 const NAV_ITEMS = [
+  { label: "Trek Leaders", href: "/trek-leaders" },
   { label: "Collaborations", href: "/collaborations" },
   { label: "Volunteers Program", href: "/volunteers" },
 ];
@@ -399,13 +400,6 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
               className="rounded-md px-3 py-2.5 text-base font-medium text-[#262B27] hover:bg-[#E9E9E2]/60"
             >
               Upcoming Events
-            </Link>
-            <Link
-              href="/trek-leaders"
-              onClick={() => setMobileOpen(false)}
-              className="rounded-md px-3 py-2.5 text-base font-medium text-[#262B27] hover:bg-[#E9E9E2]/60"
-            >
-              Trek Leaders
             </Link>
             <Link
               href="/contact"
