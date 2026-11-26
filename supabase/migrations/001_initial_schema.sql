@@ -250,7 +250,7 @@ CREATE TABLE IF NOT EXISTS public.website_settings (
   site_name TEXT NOT NULL DEFAULT 'Kaggadu Adventures',
   tagline TEXT NOT NULL DEFAULT 'LIVE WITH NATURE',
   supporting_tagline TEXT NOT NULL DEFAULT 'Explore | Experience | Create Memories',
-  logo_url TEXT,
+  logo_url TEXT DEFAULT '/images/kaggadu-logo.png',
   contact_email TEXT NOT NULL DEFAULT 'kaggadu.com',
   contact_phone TEXT NOT NULL DEFAULT '7760013106',
   secondary_phone TEXT NOT NULL DEFAULT '8310668859',

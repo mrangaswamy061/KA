@@ -15,9 +15,18 @@ export function SiteFooter({ settings }: { settings: WebsiteSettings }) {
           {/* Brand */}
           <div className="space-y-4">
             <Link href="/" className="inline-flex items-center gap-2.5">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#244B3C] text-[#FFFDF8]">
-                <Mountain className="h-5 w-5" aria-hidden="true" />
-              </span>
+              {settings.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={settings.logo_url}
+                  alt={settings.site_name}
+                  className="h-11 w-11 rounded-full object-cover bg-white border border-[#A8B8A0]/40"
+                />
+              ) : (
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#244B3C] text-[#FFFDF8]">
+                  <Mountain className="h-5 w-5" aria-hidden="true" />
+                </span>
+              )}
               <div>
                 <p className="font-editorial text-xl font-semibold text-[#FFFDF8]">
                   {settings.site_name}

@@ -22,10 +22,53 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [treksOpen, setTreksOpen] = useState(false);
+  const [mobileOpenPath, setMobileOpenPath] = useState<string | null>(null);
+  const [treksOpenPath, setTreksOpenPath] = useState<string | null>(null);
   const [mobileTreksOpen, setMobileTreksOpen] = useState(false);
   const treksMenuRef = useRef<HTMLDivElement>(null);
+  const hoverOpenedAtRef = useRef<number>(0);
+
+  const mobileOpen = mobileOpenPath === pathname;
+  const treksOpen = treksOpenPath === pathname;
+
+  const setMobileOpen = (next: boolean | ((prev: boolean) => boolean)) => {
+    setMobileOpenPath((prevPath) => {
+      const prev = prevPath === pathname;
+      const resolved = typeof next === "function" ? next(prev) : next;
+      return resolved ? pathname : null;
+    });
+  };
+
+  const setTreksOpen = (next: boolean | ((prev: boolean) => boolean)) => {
+    setTreksOpenPath((prevPath) => {
+      const prev = prevPath === pathname;
+      const resolved = typeof next === "function" ? next(prev) : next;
+      return resolved ? pathname : null;
+    });
+  };
+
+  const handleTreksMouseEnter = () => {
+    if (!treksOpen) {
+      hoverOpenedAtRef.current = Date.now();
+      setTreksOpen(true);
+    }
+  };
+
+  const handleTreksMouseLeave = () => {
+    hoverOpenedAtRef.current = 0;
+    setTreksOpen(false);
+  };
+
+  const handleTreksToggleClick = () => {
+    // If hover opened the menu right before this click (e.g. moving pointer onto the chevron),
+    // keep it open instead of immediately toggling it shut.
+    if (treksOpen && Date.now() - hoverOpenedAtRef.current < 350) {
+      hoverOpenedAtRef.current = 0;
+      return;
+    }
+    hoverOpenedAtRef.current = 0;
+    setTreksOpen((prev) => !prev);
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 36);
@@ -40,11 +83,11 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
         treksMenuRef.current &&
         !treksMenuRef.current.contains(event.target as Node)
       ) {
-        setTreksOpen(false);
+        setTreksOpenPath(null);
       }
     }
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setTreksOpen(false);
+      if (event.key === "Escape") setTreksOpenPath(null);
     }
     document.addEventListener("mousedown", handleOutside);
     document.addEventListener("keydown", handleEscape);
@@ -105,7 +148,7 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
               <img
                 src={settings.logo_url}
                 alt={settings.site_name}
-                className="h-10 w-auto object-contain"
+                className="h-11 w-11 rounded-full object-cover bg-white border border-[#E9E9E2]/60 shadow-sm"
               />
             ) : (
               <span
@@ -146,8 +189,8 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
             <div
               ref={treksMenuRef}
               className="relative"
-              onMouseEnter={() => setTreksOpen(true)}
-              onMouseLeave={() => setTreksOpen(false)}
+              onMouseEnter={handleTreksMouseEnter}
+              onMouseLeave={handleTreksMouseLeave}
             >
               <div className="flex items-center gap-1">
                 <Link
@@ -160,7 +203,7 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => setTreksOpen((prev) => !prev)}
+                  onClick={handleTreksToggleClick}
                   aria-expanded={treksOpen}
                   aria-haspopup="true"
                   aria-label="Toggle Treks sub-menu"

@@ -67,7 +67,7 @@ function createDefaultSettings(): WebsiteSettings {
     site_name: "Kaggadu Adventures",
     tagline: "LIVE WITH NATURE",
     supporting_tagline: "Explore | Experience | Create Memories",
-    logo_url: null,
+    logo_url: "/images/kaggadu-logo.png",
     contact_email: "kaggadu.com",
     contact_phone: "7760013106",
     secondary_phone: "8310668859",

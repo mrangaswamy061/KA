@@ -1713,12 +1713,32 @@ export function AdminDashboardClient({
                   <label className="block text-xs font-semibold text-[#8C735A] mb-1">
                     Logo URL
                   </label>
-                  <input
-                    type="text"
-                    value={settings.logo_url || ""}
-                    onChange={(e) => setSettings({ ...settings, logo_url: e.target.value })}
-                    className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={settings.logo_url || ""}
+                      onChange={(e) => setSettings({ ...settings, logo_url: e.target.value })}
+                      className="flex-1 rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
+                    />
+                    <label className="cursor-pointer inline-flex items-center gap-1 rounded-md border border-[#244B3C] px-2.5 py-2 text-xs font-semibold text-[#244B3C] hover:bg-[#244B3C] hover:text-[#FFFDF8] shrink-0">
+                      <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                      Upload Logo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            uploadImageToField(file, "logo", (url) =>
+                              setSettings((prev) => ({ ...prev, logo_url: url }))
+                            );
+                          }
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-[#8C735A] mb-1">

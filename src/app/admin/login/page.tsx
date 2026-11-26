@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Mountain, Loader2, AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Info } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 function AdminLoginForm() {
@@ -104,9 +104,12 @@ function AdminLoginForm() {
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <Link href="/" className="inline-flex items-center gap-2.5 text-[#18372D]">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#244B3C] text-[#FFFDF8]">
-              <Mountain className="h-5 w-5" aria-hidden="true" />
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/kaggadu-logo.png"
+              alt="Kaggadu Adventures"
+              className="h-11 w-11 rounded-full object-cover bg-white border border-[#E9E9E2] shadow-sm"
+            />
             <span className="font-editorial text-2xl font-semibold">
               Kaggadu Adventures
             </span>
