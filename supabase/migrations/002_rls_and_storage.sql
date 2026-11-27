@@ -39,6 +39,23 @@ ALTER TABLE public.enquiries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.collaboration_enquiries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.website_settings ENABLE ROW LEVEL SECURITY;
 
+-- Explicit schema & table privileges for Supabase API roles (governed by RLS above)
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+GRANT SELECT ON
+  public.adventures,
+  public.events,
+  public.event_images,
+  public.trek_leaders,
+  public.website_settings
+TO anon;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.is_staff_user(), public.is_admin_user() TO anon;
+
 -- PROFILES
 CREATE POLICY "Users can view own profile"
   ON public.profiles FOR SELECT
