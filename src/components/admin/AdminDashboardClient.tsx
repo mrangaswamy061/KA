@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -145,10 +145,14 @@ export function AdminDashboardClient({
   >([]);
   const [mediaLoadedFolder, setMediaLoadedFolder] = useState<string | null>(null);
   const [submittingAction, setSubmittingAction] = useState<string | null>(null);
+  const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function showToast(type: "ok" | "err", text: string) {
     setToast({ type, text });
-    setTimeout(() => setToast(null), 4500);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4500);
   }
 
   async function requestJson<T = Record<string, unknown>>(
@@ -244,20 +248,26 @@ export function AdminDashboardClient({
   }
 
   async function toggleAdventurePublish(item: Adventure) {
+    if (busyItemId) return;
+    setBusyItemId(item.id);
     const { ok, data } = await requestJson<{ item: Adventure }>("/api/admin/adventures", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: item.id, is_published: !item.is_published }),
     });
+    setBusyItemId(null);
     if (!ok) return showToast("err", data.error || "Update failed.");
     setAdventures(adventures.map((a) => (a.id === item.id ? data.item : a)));
     showToast("ok", `${item.title} ${data.item.is_published ? "published" : "unpublished"}.`);
   }
 
   async function deleteAdventure(id: string) {
-    const { ok, data } = await requestJson(`/api/admin/adventures?id=${id}`, {
+    if (busyItemId) return;
+    setBusyItemId(id);
+    const { ok, data } = await requestJson(`/api/admin/adventures?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+    setBusyItemId(null);
     if (!ok) return showToast("err", data.error || "Failed to delete activity.");
     setAdventures(adventures.filter((a) => a.id !== id));
     showToast("ok", "Activity deleted.");
@@ -298,20 +308,26 @@ export function AdminDashboardClient({
   }
 
   async function updateEventStatus(id: string, status: EventStatus) {
+    if (busyItemId) return;
+    setBusyItemId(id);
     const { ok, data } = await requestJson<{ item: EventRecord }>("/api/admin/events", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status }),
     });
+    setBusyItemId(null);
     if (!ok) return showToast("err", data.error || "Status update failed.");
     setEvents(events.map((ev) => (ev.id === id ? data.item : ev)));
     showToast("ok", "Event status updated.");
   }
 
   async function deleteEvent(id: string) {
-    const { ok, data } = await requestJson(`/api/admin/events?id=${id}`, {
+    if (busyItemId) return;
+    setBusyItemId(id);
+    const { ok, data } = await requestJson(`/api/admin/events?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+    setBusyItemId(null);
     if (!ok) {
       return showToast(
         "err",
@@ -347,26 +363,34 @@ export function AdminDashboardClient({
   }
 
   async function toggleLeaderPublish(leader: TrekLeader) {
+    if (busyItemId) return;
+    setBusyItemId(leader.id);
     const { ok, data } = await requestJson<{ item: TrekLeader }>("/api/admin/trek-leaders", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: leader.id, is_published: !leader.is_published }),
     });
+    setBusyItemId(null);
     if (!ok) return showToast("err", data.error || "Update failed.");
     setLeaders(leaders.map((l) => (l.id === leader.id ? data.item : l)));
     showToast("ok", "Leader visibility updated.");
   }
 
   async function deleteLeader(id: string) {
-    const { ok, data } = await requestJson(`/api/admin/trek-leaders?id=${id}`, {
+    if (busyItemId) return;
+    setBusyItemId(id);
+    const { ok, data } = await requestJson(`/api/admin/trek-leaders?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+    setBusyItemId(null);
     if (!ok) return showToast("err", data.error || "Failed to delete leader.");
     setLeaders(leaders.filter((l) => l.id !== id));
     showToast("ok", "Leader deleted.");
   }
 
   async function uploadLeaderPhoto(file: File, leaderId?: string) {
+    if (uploadingField) return;
+    setUploadingField(leaderId || "leader-new");
     const fd = new FormData();
     fd.append("file", file);
     fd.append("folder", "leaders");
@@ -375,11 +399,13 @@ export function AdminDashboardClient({
       body: fd,
     });
     if (!ok) {
+      setUploadingField(null);
       showToast("err", data.error || "Photo upload failed.");
       return;
     }
 
     if (!leaderId) {
+      setUploadingField(null);
       setNewLeader((prev) => ({ ...prev, avatar_url: data.publicUrl }));
       showToast("ok", "Trek guide photo uploaded.");
       return;
@@ -390,6 +416,7 @@ export function AdminDashboardClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: leaderId, avatar_url: data.publicUrl }),
     });
+    setUploadingField(null);
     if (!patch.ok) {
       showToast("err", patch.data.error || "Failed to update leader photo.");
       return;
@@ -481,7 +508,8 @@ export function AdminDashboardClient({
 
   async function uploadMedia(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || uploadingField) return;
+    setUploadingField("media");
     const fd = new FormData();
     fd.append("file", file);
     fd.append("folder", mediaFolder);
@@ -489,6 +517,7 @@ export function AdminDashboardClient({
       "/api/admin/media",
       { method: "POST", body: fd }
     );
+    setUploadingField(null);
     e.target.value = "";
     if (!ok) return showToast("err", data.error || "Upload failed.");
     setMediaItems([{ name: file.name, path: data.path, publicUrl: data.publicUrl }, ...mediaItems]);
@@ -498,8 +527,11 @@ export function AdminDashboardClient({
   async function uploadImageToField(
     file: File,
     folder: string,
+    fieldKey: string,
     onSuccess: (publicUrl: string) => void
   ) {
+    if (uploadingField) return;
+    setUploadingField(fieldKey);
     const fd = new FormData();
     fd.append("file", file);
     fd.append("folder", folder);
@@ -507,16 +539,20 @@ export function AdminDashboardClient({
       method: "POST",
       body: fd,
     });
+    setUploadingField(null);
     if (!ok) return showToast("err", data.error || "Image upload failed.");
     onSuccess(data.publicUrl);
     showToast("ok", "Image uploaded.");
   }
 
   async function deleteMedia(path: string) {
+    if (busyItemId) return;
+    setBusyItemId(path);
     const { ok, data } = await requestJson(
       `/api/admin/media?path=${encodeURIComponent(path)}`,
       { method: "DELETE" }
     );
+    setBusyItemId(null);
     if (!ok) return showToast("err", data.error || "Delete failed.");
     setMediaItems(mediaItems.filter((m) => m.path !== path));
     showToast("ok", "Media deleted.");
@@ -664,17 +700,21 @@ export function AdminDashboardClient({
                 Dashboard Overview
               </h1>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  { label: "Total Events", value: stats.totalEvents },
-                  { label: "Upcoming Published Events", value: stats.upcomingEvents },
-                  { label: "Total Registrations", value: stats.totalRegistrations },
-                  { label: "Pending Enquiries", value: stats.pendingEnquiries },
-                  { label: "Volunteer Registrations", value: stats.volunteerRegistrations },
-                  { label: "Published Activities", value: stats.publishedActivities },
-                ].map((card) => (
-                  <div
+                {(
+                  [
+                    { label: "Total Events", value: stats.totalEvents, tab: "events" },
+                    { label: "Upcoming Published Events", value: stats.upcomingEvents, tab: "events" },
+                    { label: "Total Registrations", value: stats.totalRegistrations, tab: "registrations" },
+                    { label: "Pending Enquiries", value: stats.pendingEnquiries, tab: "enquiries" },
+                    { label: "Volunteer Registrations", value: stats.volunteerRegistrations, tab: "volunteers" },
+                    { label: "Published Activities", value: stats.publishedActivities, tab: "adventures" },
+                  ] as const
+                ).map((card) => (
+                  <button
                     key={card.label}
-                    className="rounded-xl bg-[#FFFDF8] border border-[#E9E9E2] p-5"
+                    type="button"
+                    onClick={() => setActiveTab(card.tab)}
+                    className="text-left rounded-xl bg-[#FFFDF8] border border-[#E9E9E2] p-5 hover:border-[#244B3C] transition-colors"
                   >
                     <p className="text-xs font-semibold uppercase tracking-wider text-[#8C735A]">
                       {card.label}
@@ -682,7 +722,7 @@ export function AdminDashboardClient({
                     <p className="font-editorial text-3xl font-semibold text-[#18372D] mt-2">
                       {card.value}
                     </p>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -777,10 +817,11 @@ export function AdminDashboardClient({
                     />
                     <label className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-md border border-[#244B3C] px-3 py-2 text-xs font-semibold text-[#244B3C] hover:bg-[#244B3C] hover:text-[#FFFDF8] transition-colors shrink-0">
                       <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-                      Upload Cover
+                      {uploadingField === "adventure" ? "Uploading..." : "Upload Cover"}
                       <input
                         type="file"
                         accept="image/*"
+                        disabled={uploadingField !== null}
                         className="sr-only"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
@@ -791,7 +832,7 @@ export function AdminDashboardClient({
                               ? "trips"
                               : newAdv.category;
                           if (file) {
-                            uploadImageToField(file, folder, (url) =>
+                            uploadImageToField(file, folder, "adventure", (url) =>
                               setNewAdv((prev) => ({ ...prev, cover_image_url: url }))
                             );
                           }
@@ -868,8 +909,9 @@ export function AdminDashboardClient({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
+                          disabled={busyItemId === item.id}
                           onClick={() => toggleAdventurePublish(item)}
-                          className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                          className={`rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
                             item.is_published
                               ? "bg-[#244B3C] text-[#FFFDF8]"
                               : "border border-[#E9E9E2] text-[#262B27]"
@@ -879,9 +921,10 @@ export function AdminDashboardClient({
                         </button>
                         <button
                           type="button"
+                          disabled={busyItemId === item.id}
                           onClick={() => deleteAdventure(item.id)}
                           aria-label={`Delete ${item.title}`}
-                          className="rounded-md p-2 text-red-700 hover:bg-red-50"
+                          className="rounded-md p-2 text-red-700 hover:bg-red-50 disabled:opacity-50"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -1025,10 +1068,11 @@ export function AdminDashboardClient({
                     />
                     <label className="cursor-pointer inline-flex items-center gap-1 rounded-md border border-[#244B3C] px-2.5 py-2 text-xs font-semibold text-[#244B3C] hover:bg-[#244B3C] hover:text-[#FFFDF8] shrink-0">
                       <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-                      Upload
+                      {uploadingField === "event" ? "Uploading..." : "Upload"}
                       <input
                         type="file"
                         accept="image/*"
+                        disabled={uploadingField !== null}
                         className="sr-only"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
@@ -1043,7 +1087,7 @@ export function AdminDashboardClient({
                               ? "general"
                               : newEvent.category;
                           if (file) {
-                            uploadImageToField(file, folder, (url) =>
+                            uploadImageToField(file, folder, "event", (url) =>
                               setNewEvent((prev) => ({ ...prev, cover_image_url: url }))
                             );
                           }
@@ -1114,10 +1158,11 @@ export function AdminDashboardClient({
                     <div className="flex items-center gap-2">
                       <select
                         value={ev.status}
+                        disabled={busyItemId === ev.id}
                         onChange={(e) =>
                           updateEventStatus(ev.id, e.target.value as EventStatus)
                         }
-                        className="rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-2.5 py-1.5 text-xs font-medium"
+                        className="rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-2.5 py-1.5 text-xs font-medium disabled:opacity-50"
                       >
                         <option value="draft">Draft</option>
                         <option value="published">Published</option>
@@ -1128,9 +1173,10 @@ export function AdminDashboardClient({
                       </select>
                       <button
                         type="button"
+                        disabled={busyItemId === ev.id}
                         onClick={() => deleteEvent(ev.id)}
                         aria-label={`Delete ${ev.title}`}
-                        className="rounded-md p-2 text-red-700 hover:bg-red-50"
+                        className="rounded-md p-2 text-red-700 hover:bg-red-50 disabled:opacity-50"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -1351,10 +1397,15 @@ export function AdminDashboardClient({
                     <div className="flex items-center gap-2 flex-wrap">
                       <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-[#E9E9E2] px-3 py-1.5 text-xs font-semibold text-[#244B3C] hover:border-[#244B3C] transition-colors">
                         <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-                        {leader.avatar_url ? "Change Photo" : "Add Photo"}
+                        {uploadingField === leader.id
+                          ? "Uploading..."
+                          : leader.avatar_url
+                          ? "Change Photo"
+                          : "Add Photo"}
                         <input
                           type="file"
                           accept="image/*"
+                          disabled={uploadingField !== null}
                           className="sr-only"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
@@ -1365,8 +1416,9 @@ export function AdminDashboardClient({
                       </label>
                       <button
                         type="button"
+                        disabled={busyItemId === leader.id}
                         onClick={() => toggleLeaderPublish(leader)}
-                        className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                        className={`rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
                           leader.is_published
                             ? "bg-[#244B3C] text-[#FFFDF8]"
                             : "border border-[#E9E9E2]"
@@ -1376,8 +1428,10 @@ export function AdminDashboardClient({
                       </button>
                       <button
                         type="button"
+                        disabled={busyItemId === leader.id}
                         onClick={() => deleteLeader(leader.id)}
-                        className="rounded-md p-2 text-red-700 hover:bg-red-50"
+                        aria-label={`Delete ${leader.full_name}`}
+                        className="rounded-md p-2 text-red-700 hover:bg-red-50 disabled:opacity-50"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -1671,10 +1725,11 @@ export function AdminDashboardClient({
                 </div>
                 <label className="inline-flex items-center gap-2 rounded-md bg-[#244B3C] px-4 py-2 text-xs font-semibold text-[#FFFDF8] cursor-pointer hover:bg-[#18372D]">
                   <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-                  Upload Image
+                  {uploadingField === "media" ? "Uploading..." : "Upload Image"}
                   <input
                     type="file"
                     accept="image/*"
+                    disabled={uploadingField !== null}
                     onChange={uploadMedia}
                     className="sr-only"
                   />
@@ -1712,8 +1767,9 @@ export function AdminDashboardClient({
                         </button>
                         <button
                           type="button"
+                          disabled={busyItemId === m.path}
                           onClick={() => deleteMedia(m.path)}
-                          className="text-red-700 hover:underline text-xs"
+                          className="text-red-700 hover:underline text-xs disabled:opacity-50"
                         >
                           Delete
                         </button>
@@ -1843,15 +1899,16 @@ export function AdminDashboardClient({
                     />
                     <label className="cursor-pointer inline-flex items-center gap-1 rounded-md border border-[#244B3C] px-2.5 py-2 text-xs font-semibold text-[#244B3C] hover:bg-[#244B3C] hover:text-[#FFFDF8] shrink-0">
                       <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-                      Upload Logo
+                      {uploadingField === "logo" ? "Uploading..." : "Upload Logo"}
                       <input
                         type="file"
                         accept="image/*"
+                        disabled={uploadingField !== null}
                         className="sr-only"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            uploadImageToField(file, "logo", (url) =>
+                            uploadImageToField(file, "logo", "logo", (url) =>
                               setSettings((prev) => ({ ...prev, logo_url: url }))
                             );
                           }

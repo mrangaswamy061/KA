@@ -6,7 +6,12 @@ import {
 } from "@/lib/services/admin-auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { newUuid, readLocalDb, writeLocalDb } from "@/lib/db/local-store";
-import { parseOptionalNumber, safeSlug } from "@/lib/utils/format";
+import {
+  normalizeOptionalDeadline,
+  normalizeOptionalTime,
+  parseOptionalNumber,
+  safeSlug,
+} from "@/lib/utils/format";
 import type { EventCategory, EventStatus } from "@/types/database";
 
 const DIRECT_STRING_FIELDS = [
@@ -90,6 +95,16 @@ export async function POST(request: Request) {
   const latitude = parseOptionalNumber(body.latitude);
   const longitude = parseOptionalNumber(body.longitude);
 
+  const parsedStartTime = normalizeOptionalTime(body.start_time);
+  if (!parsedStartTime.ok) {
+    return NextResponse.json({ error: parsedStartTime.error }, { status: 400 });
+  }
+  const parsedEndTime = normalizeOptionalTime(body.end_time);
+  if (!parsedEndTime.ok) {
+    return NextResponse.json({ error: parsedEndTime.error }, { status: 400 });
+  }
+  const normalizedDeadline = normalizeOptionalDeadline(body.registration_deadline);
+
   const supabase = createAdminSupabaseClient();
   if (!supabase) {
     const db = readLocalDb();
@@ -110,11 +125,11 @@ export async function POST(request: Request) {
       longitude,
       start_date: startDate,
       end_date: (body.end_date as string) || null,
-      start_time: (body.start_time as string) || null,
-      end_time: (body.end_time as string) || null,
+      start_time: parsedStartTime.value,
+      end_time: parsedEndTime.value,
       price,
       max_participants: maxParticipants,
-      registration_deadline: (body.registration_deadline as string) || null,
+      registration_deadline: normalizedDeadline,
       status: (body.status as EventStatus) || "draft",
       registration_instructions: (body.registration_instructions as string) || null,
       cover_image_url: (body.cover_image_url as string) || null,
@@ -153,11 +168,11 @@ export async function POST(request: Request) {
       longitude,
       start_date: startDate,
       end_date: body.end_date || null,
-      start_time: body.start_time || null,
-      end_time: body.end_time || null,
+      start_time: parsedStartTime.value,
+      end_time: parsedEndTime.value,
       price,
       max_participants: maxParticipants,
-      registration_deadline: body.registration_deadline || null,
+      registration_deadline: normalizedDeadline,
       status: body.status || "draft",
       registration_instructions: body.registration_instructions || null,
       cover_image_url: body.cover_image_url || null,
@@ -196,6 +211,25 @@ export async function PATCH(request: Request) {
   }
   for (const key of NULLABLE_FIELDS) {
     if (key in body) updates[key] = body[key] === "" ? null : body[key];
+  }
+  if ("start_time" in updates) {
+    const parsedTime = normalizeOptionalTime(updates.start_time);
+    if (!parsedTime.ok) {
+      return NextResponse.json({ error: parsedTime.error }, { status: 400 });
+    }
+    updates.start_time = parsedTime.value;
+  }
+  if ("end_time" in updates) {
+    const parsedTime = normalizeOptionalTime(updates.end_time);
+    if (!parsedTime.ok) {
+      return NextResponse.json({ error: parsedTime.error }, { status: 400 });
+    }
+    updates.end_time = parsedTime.value;
+  }
+  if ("registration_deadline" in updates) {
+    updates.registration_deadline = normalizeOptionalDeadline(
+      updates.registration_deadline
+    );
   }
   for (const numKey of ["price", "max_participants", "latitude", "longitude"] as const) {
     if (numKey in body) {
@@ -266,7 +300,15 @@ export async function DELETE(request: Request) {
   }
 
   const { error } = await supabase.from("events").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    if (error.code === "23503") {
+      return NextResponse.json(
+        { error: "Cannot delete event with existing registrations." },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
   revalidatePath("/", "layout");
   return NextResponse.json({ success: true });
 }

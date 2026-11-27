@@ -84,6 +84,75 @@ export function parseOptionalNumber(val: unknown): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
+/**
+ * Normalizes human time input ("6 AM", "06:30 pm", "18:00", "18:00:00") into HH:MM:SS
+ * compatible with PostgreSQL TIME columns. Returns `{ ok: false }` on invalid non-empty text.
+ */
+export function normalizeOptionalTime(
+  val: unknown
+): { ok: true; value: string | null } | { ok: false; error: string } {
+  if (val === null || val === undefined) return { ok: true, value: null };
+  const raw = String(val).trim();
+  if (!raw) return { ok: true, value: null };
+
+  const m = raw.match(
+    /^(\d{1,2})(?:[:.](\d{2})(?:[:.](\d{2}))?)?\s*(am|pm)?$/i
+  );
+  if (!m) {
+    return {
+      ok: false,
+      error: `Invalid time "${raw}". Use format like 06:00 AM or 18:00.`,
+    };
+  }
+
+  let hours = Number(m[1]);
+  const minutes = m[2] ? Number(m[2]) : 0;
+  const seconds = m[3] ? Number(m[3]) : 0;
+  const meridiem = m[4]?.toLowerCase();
+
+  if (minutes > 59 || seconds > 59) {
+    return {
+      ok: false,
+      error: `Invalid time "${raw}". Minutes and seconds must be 00–59.`,
+    };
+  }
+
+  if (meridiem) {
+    if (hours < 1 || hours > 12) {
+      return {
+        ok: false,
+        error: `Invalid 12-hour time "${raw}". Hours must be 1–12 with AM/PM.`,
+      };
+    }
+    if (meridiem === "pm" && hours < 12) hours += 12;
+    if (meridiem === "am" && hours === 12) hours = 0;
+  } else if (hours > 23) {
+    return {
+      ok: false,
+      error: `Invalid 24-hour time "${raw}". Hours must be 0–23.`,
+    };
+  }
+
+  const hh = String(hours).padStart(2, "0");
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+  return { ok: true, value: `${hh}:${mm}:${ss}` };
+}
+
+/**
+ * Expands date-only deadlines (YYYY-MM-DD) to end-of-day IST (23:59:59+05:30)
+ * so Postgres TIMESTAMPTZ does not close registrations early at 05:30 AM IST.
+ */
+export function normalizeOptionalDeadline(val: unknown): string | null {
+  if (val === null || val === undefined) return null;
+  const raw = String(val).trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return `${raw}T23:59:59+05:30`;
+  }
+  return raw;
+}
+
 export function escapeHtml(input: string): string {
   return input
     .replace(/&/g, "&amp;")

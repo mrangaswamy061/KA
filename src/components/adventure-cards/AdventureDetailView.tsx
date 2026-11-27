@@ -20,7 +20,7 @@ import type {
   EventRecord,
   WebsiteSettings,
 } from "@/types/database";
-import { formatEventDate, formatINR } from "@/lib/utils/format";
+import { formatEventDate, formatINR, getIstTodayDateString } from "@/lib/utils/format";
 import { WhatsAppButton } from "@/components/ui/WhatsAppButton";
 
 const FALLBACK_IMAGES: Record<AdventureCategory, string> = {
@@ -49,7 +49,11 @@ export function AdventureDetailView({
   settings: WebsiteSettings;
 }) {
   const back = BACK_ROUTES[adventure.category];
-  const primaryEvent = upcomingEvents[0];
+  const today = getIstTodayDateString();
+  const primaryEvent =
+    upcomingEvents.find((e) => e.status === "published" && e.start_date >= today) ??
+    upcomingEvents.find((e) => e.status === "published") ??
+    null;
 
   return (
     <div className="pt-24 pb-20 bg-[#F6F4ED]">
@@ -165,7 +169,9 @@ export function AdventureDetailView({
             <div className="space-y-3">
               {primaryEvent ? (
                 <Link
-                  href={`/events/${primaryEvent.slug}#register`}
+                  href={`${
+                    primaryEvent.category === "volunteer" ? "/volunteers" : "/events"
+                  }/${primaryEvent.slug}#register`}
                   className="flex w-full items-center justify-center gap-2 rounded-md bg-[#244B3C] px-5 py-3.5 text-sm font-semibold text-[#FFFDF8] hover:bg-[#18372D] transition-colors"
                 >
                   REGISTER ONLINE

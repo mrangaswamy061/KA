@@ -10,6 +10,8 @@ import {
   escapeHtml,
   generateReferenceCode,
   isDeadlinePassed,
+  normalizeOptionalDeadline,
+  normalizeOptionalTime,
   parseOptionalNumber,
   safeSlug,
   slugify,
@@ -120,4 +122,21 @@ test("hasSupabaseAdminKey accepts both SUPABASE_SECRET_KEY and SUPABASE_SERVICE_
     if (prevService === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     else process.env.SUPABASE_SERVICE_ROLE_KEY = prevService;
   }
+});
+
+test("normalizeOptionalTime and normalizeOptionalDeadline handle flexible formats", () => {
+  assert.deepEqual(normalizeOptionalTime(""), { ok: true, value: null });
+  assert.deepEqual(normalizeOptionalTime("6 AM"), { ok: true, value: "06:00:00" });
+  assert.deepEqual(normalizeOptionalTime("6:30 pm"), { ok: true, value: "18:30:00" });
+  assert.deepEqual(normalizeOptionalTime("12:15 am"), { ok: true, value: "00:15:00" });
+  assert.deepEqual(normalizeOptionalTime("12:00 pm"), { ok: true, value: "12:00:00" });
+  assert.deepEqual(normalizeOptionalTime("17:45"), { ok: true, value: "17:45:00" });
+  assert.equal(normalizeOptionalTime("25:00").ok, false);
+  assert.equal(normalizeOptionalTime("morning").ok, false);
+
+  assert.equal(normalizeOptionalDeadline(""), null);
+  assert.equal(
+    normalizeOptionalDeadline("2026-12-03"),
+    "2026-12-03T23:59:59+05:30"
+  );
 });
