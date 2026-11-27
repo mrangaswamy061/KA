@@ -6,7 +6,19 @@ import {
   contactEnquirySchema,
 } from "./schemas.ts";
 import { buildWhatsAppEnquiryUrl } from "../whatsapp/links.ts";
-import { generateReferenceCode, slugify, toCsv } from "../utils/format.ts";
+import {
+  escapeHtml,
+  generateReferenceCode,
+  isDeadlinePassed,
+  parseOptionalNumber,
+  safeSlug,
+  slugify,
+  toCsv,
+} from "../utils/format.ts";
+import {
+  signLocalSessionToken,
+  verifyLocalSessionToken,
+} from "../auth/local-token.ts";
 
 test("normalizeIndianMobile handles +91 and 0 prefixes", () => {
   assert.equal(normalizeIndianMobile("+91 98765 43210"), "9876543210");
@@ -61,9 +73,28 @@ test("buildWhatsAppEnquiryUrl builds prefilled wa.me link", () => {
   assert.ok(url?.includes("Kudremukh%20Trek"));
 });
 
-test("generateReferenceCode, slugify, and toCsv work as expected", () => {
+test("generateReferenceCode, slugify, safeSlug, and toCsv work as expected", () => {
   const code = generateReferenceCode("KGD");
   assert.match(code, /^KGD-\d{8}-[A-F0-9]{4}$/);
   assert.equal(slugify("Kudremukh Peak Trek!"), "kudremukh-peak-trek");
+  assert.match(safeSlug("", "!!!"), /^item-[a-z0-9]+$/);
   assert.equal(toCsv(["Name", "Note"], [["A", 'Hello "World"']]), 'Name,Note\r\nA,"Hello ""World"""');
+});
+
+test("parseOptionalNumber, escapeHtml, and isDeadlinePassed handle edge cases", () => {
+  assert.equal(parseOptionalNumber(""), null);
+  assert.equal(parseOptionalNumber("abc"), null);
+  assert.equal(parseOptionalNumber("1500"), 1500);
+  assert.equal(escapeHtml('<script>"test"</script>'), "&lt;script&gt;&quot;test&quot;&lt;/script&gt;");
+  assert.equal(isDeadlinePassed("2020-01-01"), true);
+  assert.equal(isDeadlinePassed("2099-12-31"), false);
+  assert.equal(isDeadlinePassed(null), false);
+});
+
+test("signLocalSessionToken and verifyLocalSessionToken reject forged tokens", () => {
+  const valid = signLocalSessionToken("admin@example.com");
+  const verified = verifyLocalSessionToken(valid);
+  assert.equal(verified?.email, "admin@example.com");
+  assert.equal(verifyLocalSessionToken("forged.token"), null);
+  assert.equal(verifyLocalSessionToken(undefined), null);
 });

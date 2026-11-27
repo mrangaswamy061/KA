@@ -13,9 +13,7 @@ function AdminLoginForm() {
 
   const configured = isSupabaseConfigured();
 
-  const [email, setEmail] = useState(
-    configured ? "" : "MAHABALA@2020"
-  );
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "forgot">("login");
   const [loading, setLoading] = useState(false);
@@ -128,13 +126,9 @@ function AdminLoginForm() {
             <div className="rounded-md border border-[#A8B8A0] bg-[#A8B8A0]/15 px-4 py-3 text-xs text-[#18372D] flex items-start gap-2">
               <Info className="h-4 w-4 shrink-0 mt-0.5 text-[#244B3C]" aria-hidden="true" />
               <div>
-                <p className="font-semibold">Local Persistent Mode Active</p>
+                <p className="font-semibold">Staff & Administrator Sign-In</p>
                 <p className="mt-0.5 text-[#262B27]/80">
-                  Supabase is not configured yet, so data persists locally in{" "}
-                  <code>data/kaggadu-db.json</code>. Sign in with your configured
-                  local admin ID and password (override via{" "}
-                  <code>LOCAL_ADMIN_EMAIL</code> and{" "}
-                  <code>LOCAL_ADMIN_PASSWORD</code>).
+                  Enter your assigned administrator ID and password to manage Kaggadu Adventures.
                 </p>
               </div>
             </div>
@@ -174,7 +168,7 @@ function AdminLoginForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={configured ? "admin@kaggaduadventures.com" : "MAHABALA@2020"}
+                placeholder={configured ? "admin@kaggaduadventures.com" : "Enter Admin ID or email"}
                 className="w-full rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3.5 py-2.5 text-sm text-[#262B27] focus:border-[#244B3C] focus:outline-none"
               />
             </div>

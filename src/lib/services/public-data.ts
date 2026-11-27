@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { readLocalDb } from "@/lib/db/local-store";
+import { getIstTodayDateString } from "@/lib/utils/format";
 import type {
   Adventure,
   AdventureCategory,
@@ -144,7 +145,7 @@ export async function getPublishedEvents(options?: {
       items = items.filter((e) => e.category === options.category);
     }
     if (options?.upcomingOnly) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getIstTodayDateString();
       items = items.filter((e) => e.start_date >= today);
     }
     items.sort((a, b) => a.start_date.localeCompare(b.start_date));
@@ -161,7 +162,7 @@ export async function getPublishedEvents(options?: {
     query = query.eq("category", options.category);
   }
   if (options?.upcomingOnly) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getIstTodayDateString();
     query = query.gte("start_date", today);
   }
   if (options?.limit) {

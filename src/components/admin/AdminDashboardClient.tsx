@@ -119,6 +119,8 @@ export function AdminDashboardClient({
     start_date: "",
     end_date: "",
     start_time: "",
+    end_time: "",
+    registration_deadline: "",
     price: "",
     max_participants: "",
     short_description: "",
@@ -142,10 +144,38 @@ export function AdminDashboardClient({
     Array<{ name: string; path: string; publicUrl: string }>
   >([]);
   const [mediaLoadedFolder, setMediaLoadedFolder] = useState<string | null>(null);
+  const [submittingAction, setSubmittingAction] = useState<string | null>(null);
 
   function showToast(type: "ok" | "err", text: string) {
     setToast({ type, text });
     setTimeout(() => setToast(null), 4500);
+  }
+
+  async function requestJson<T = Record<string, unknown>>(
+    input: string,
+    init?: RequestInit
+  ): Promise<{ ok: boolean; data: T & { error?: string } }> {
+    try {
+      const res = await fetch(input, init);
+      let data: T & { error?: string } = {} as T & { error?: string };
+      try {
+        data = (await res.json()) as T & { error?: string };
+      } catch {
+        data = {
+          error: res.ok
+            ? undefined
+            : `Server returned status ${res.status}.`,
+        } as T & { error?: string };
+      }
+      return { ok: res.ok, data };
+    } catch {
+      return {
+        ok: false,
+        data: { error: "Network error. Please check your connection and try again." } as T & {
+          error?: string;
+        },
+      };
+    }
   }
 
   async function handleSignOut() {
@@ -153,14 +183,19 @@ export function AdminDashboardClient({
       const supabase = createClient();
       await supabase.auth.signOut();
     } else {
-      await fetch("/api/admin/local-logout", { method: "POST" });
+      await requestJson("/api/admin/local-logout", { method: "POST" });
     }
     router.push("/admin/login");
     router.refresh();
   }
 
   // Overview stats
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
   const stats = useMemo(
     () => ({
       totalEvents: events.length,
@@ -180,13 +215,15 @@ export function AdminDashboardClient({
   // Adventure CRUD
   async function createAdventure(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/admin/adventures", {
+    if (submittingAction) return;
+    setSubmittingAction("adventure");
+    const { ok, data } = await requestJson<{ item: Adventure }>("/api/admin/adventures", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newAdv),
     });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Failed to create activity.");
+    setSubmittingAction(null);
+    if (!ok) return showToast("err", data.error || "Failed to create activity.");
     setAdventures([data.item, ...adventures]);
     setNewAdv({
       category: newAdv.category,
@@ -207,20 +244,21 @@ export function AdminDashboardClient({
   }
 
   async function toggleAdventurePublish(item: Adventure) {
-    const res = await fetch("/api/admin/adventures", {
+    const { ok, data } = await requestJson<{ item: Adventure }>("/api/admin/adventures", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: item.id, is_published: !item.is_published }),
     });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Update failed.");
+    if (!ok) return showToast("err", data.error || "Update failed.");
     setAdventures(adventures.map((a) => (a.id === item.id ? data.item : a)));
     showToast("ok", `${item.title} ${data.item.is_published ? "published" : "unpublished"}.`);
   }
 
   async function deleteAdventure(id: string) {
-    const res = await fetch(`/api/admin/adventures?id=${id}`, { method: "DELETE" });
-    if (!res.ok) return showToast("err", "Failed to delete activity.");
+    const { ok, data } = await requestJson(`/api/admin/adventures?id=${id}`, {
+      method: "DELETE",
+    });
+    if (!ok) return showToast("err", data.error || "Failed to delete activity.");
     setAdventures(adventures.filter((a) => a.id !== id));
     showToast("ok", "Activity deleted.");
   }
@@ -228,13 +266,15 @@ export function AdminDashboardClient({
   // Event CRUD
   async function createEvent(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/admin/events", {
+    if (submittingAction) return;
+    setSubmittingAction("event");
+    const { ok, data } = await requestJson<{ item: EventRecord }>("/api/admin/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newEvent),
     });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Failed to create event.");
+    setSubmittingAction(null);
+    if (!ok) return showToast("err", data.error || "Failed to create event.");
     setEvents([...events, data.item]);
     setNewEvent({
       category: "trek",
@@ -245,6 +285,8 @@ export function AdminDashboardClient({
       start_date: "",
       end_date: "",
       start_time: "",
+      end_time: "",
+      registration_deadline: "",
       price: "",
       max_participants: "",
       short_description: "",
@@ -256,20 +298,26 @@ export function AdminDashboardClient({
   }
 
   async function updateEventStatus(id: string, status: EventStatus) {
-    const res = await fetch("/api/admin/events", {
+    const { ok, data } = await requestJson<{ item: EventRecord }>("/api/admin/events", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status }),
     });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Status update failed.");
+    if (!ok) return showToast("err", data.error || "Status update failed.");
     setEvents(events.map((ev) => (ev.id === id ? data.item : ev)));
     showToast("ok", "Event status updated.");
   }
 
   async function deleteEvent(id: string) {
-    const res = await fetch(`/api/admin/events?id=${id}`, { method: "DELETE" });
-    if (!res.ok) return showToast("err", "Cannot delete event (may have linked registrations).");
+    const { ok, data } = await requestJson(`/api/admin/events?id=${id}`, {
+      method: "DELETE",
+    });
+    if (!ok) {
+      return showToast(
+        "err",
+        data.error || "Cannot delete event (may have linked registrations)."
+      );
+    }
     setEvents(events.filter((ev) => ev.id !== id));
     showToast("ok", "Event deleted.");
   }
@@ -277,13 +325,15 @@ export function AdminDashboardClient({
   // Leader CRUD
   async function createLeader(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/admin/trek-leaders", {
+    if (submittingAction) return;
+    setSubmittingAction("leader");
+    const { ok, data } = await requestJson<{ item: TrekLeader }>("/api/admin/trek-leaders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newLeader),
     });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Failed to create leader.");
+    setSubmittingAction(null);
+    if (!ok) return showToast("err", data.error || "Failed to create leader.");
     setLeaders([...leaders, data.item]);
     setNewLeader({
       full_name: "",
@@ -297,20 +347,21 @@ export function AdminDashboardClient({
   }
 
   async function toggleLeaderPublish(leader: TrekLeader) {
-    const res = await fetch("/api/admin/trek-leaders", {
+    const { ok, data } = await requestJson<{ item: TrekLeader }>("/api/admin/trek-leaders", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: leader.id, is_published: !leader.is_published }),
     });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Update failed.");
+    if (!ok) return showToast("err", data.error || "Update failed.");
     setLeaders(leaders.map((l) => (l.id === leader.id ? data.item : l)));
     showToast("ok", "Leader visibility updated.");
   }
 
   async function deleteLeader(id: string) {
-    const res = await fetch(`/api/admin/trek-leaders?id=${id}`, { method: "DELETE" });
-    if (!res.ok) return showToast("err", "Failed to delete leader.");
+    const { ok, data } = await requestJson(`/api/admin/trek-leaders?id=${id}`, {
+      method: "DELETE",
+    });
+    if (!ok) return showToast("err", data.error || "Failed to delete leader.");
     setLeaders(leaders.filter((l) => l.id !== id));
     showToast("ok", "Leader deleted.");
   }
@@ -319,9 +370,11 @@ export function AdminDashboardClient({
     const fd = new FormData();
     fd.append("file", file);
     fd.append("folder", "leaders");
-    const res = await fetch("/api/admin/media", { method: "POST", body: fd });
-    const data = await res.json();
-    if (!res.ok) {
+    const { ok, data } = await requestJson<{ publicUrl: string }>("/api/admin/media", {
+      method: "POST",
+      body: fd,
+    });
+    if (!ok) {
       showToast("err", data.error || "Photo upload failed.");
       return;
     }
@@ -332,41 +385,60 @@ export function AdminDashboardClient({
       return;
     }
 
-    const patchRes = await fetch("/api/admin/trek-leaders", {
+    const patch = await requestJson<{ item: TrekLeader }>("/api/admin/trek-leaders", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: leaderId, avatar_url: data.publicUrl }),
     });
-    const patchData = await patchRes.json();
-    if (!patchRes.ok) {
-      showToast("err", patchData.error || "Failed to update leader photo.");
+    if (!patch.ok) {
+      showToast("err", patch.data.error || "Failed to update leader photo.");
       return;
     }
-    setLeaders((prev) => prev.map((l) => (l.id === leaderId ? patchData.item : l)));
+    setLeaders((prev) => prev.map((l) => (l.id === leaderId ? patch.data.item : l)));
     showToast("ok", "Trek guide photo updated.");
   }
 
   // Registrations & Enquiries updates
-  async function updateRegistrationStatus(
+  async function updateRegistration(
     id: string,
-    status: RegistrationStatus,
+    updates: { status?: RegistrationStatus; internal_notes?: string },
     type: "standard" | "volunteer" = "standard"
   ) {
-    const res = await fetch("/api/admin/registrations", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status, type }),
-    });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Failed to update registration.");
+    const { ok, data } = await requestJson<{ item: Registration | VolunteerRegistration }>(
+      "/api/admin/registrations",
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, type, ...updates }),
+      }
+    );
+    if (!ok) return showToast("err", data.error || "Failed to update registration.");
     if (type === "volunteer") {
-      setVolRegs(volRegs.map((r) => (r.id === id ? { ...r, status: data.item.status } : r)));
+      setVolRegs(
+        volRegs.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                status: data.item.status,
+                internal_notes: data.item.internal_notes,
+              }
+            : r
+        )
+      );
     } else {
       setRegistrations(
-        registrations.map((r) => (r.id === id ? { ...r, status: data.item.status } : r))
+        registrations.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                status: data.item.status,
+                internal_notes: data.item.internal_notes,
+              }
+            : r
+        )
       );
     }
-    showToast("ok", "Registration status updated.");
+    showToast("ok", "Registration updated.");
   }
 
   async function updateEnquiry(
@@ -374,17 +446,21 @@ export function AdminDashboardClient({
     kind: "general" | "collaboration",
     updates: { status?: string; internal_notes?: string }
   ) {
-    const res = await fetch("/api/admin/enquiries", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, kind, ...updates }),
-    });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Failed to update enquiry.");
+    const { ok, data } = await requestJson<{ item: Enquiry | CollaborationEnquiry }>(
+      "/api/admin/enquiries",
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, kind, ...updates }),
+      }
+    );
+    if (!ok) return showToast("err", data.error || "Failed to update enquiry.");
     if (kind === "collaboration") {
-      setCollaborations(collaborations.map((c) => (c.id === id ? data.item : c)));
+      setCollaborations(
+        collaborations.map((c) => (c.id === id ? (data.item as CollaborationEnquiry) : c))
+      );
     } else {
-      setEnquiries(enquiries.map((e) => (e.id === id ? data.item : e)));
+      setEnquiries(enquiries.map((e) => (e.id === id ? (data.item as Enquiry) : e)));
     }
     showToast("ok", "Enquiry updated.");
   }
@@ -392,9 +468,10 @@ export function AdminDashboardClient({
   // Media Manager
   async function loadMedia(folder: string) {
     setMediaFolder(folder);
-    const res = await fetch(`/api/admin/media?folder=${folder}`);
-    const data = await res.json();
-    if (res.ok) {
+    const { ok, data } = await requestJson<{
+      items: Array<{ name: string; path: string; publicUrl: string }>;
+    }>(`/api/admin/media?folder=${encodeURIComponent(folder)}`);
+    if (ok) {
       setMediaItems(data.items || []);
       setMediaLoadedFolder(folder);
     } else {
@@ -408,9 +485,12 @@ export function AdminDashboardClient({
     const fd = new FormData();
     fd.append("file", file);
     fd.append("folder", mediaFolder);
-    const res = await fetch("/api/admin/media", { method: "POST", body: fd });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Upload failed.");
+    const { ok, data } = await requestJson<{ path: string; publicUrl: string }>(
+      "/api/admin/media",
+      { method: "POST", body: fd }
+    );
+    e.target.value = "";
+    if (!ok) return showToast("err", data.error || "Upload failed.");
     setMediaItems([{ name: file.name, path: data.path, publicUrl: data.publicUrl }, ...mediaItems]);
     showToast("ok", "Image uploaded.");
   }
@@ -423,18 +503,21 @@ export function AdminDashboardClient({
     const fd = new FormData();
     fd.append("file", file);
     fd.append("folder", folder);
-    const res = await fetch("/api/admin/media", { method: "POST", body: fd });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Image upload failed.");
+    const { ok, data } = await requestJson<{ publicUrl: string }>("/api/admin/media", {
+      method: "POST",
+      body: fd,
+    });
+    if (!ok) return showToast("err", data.error || "Image upload failed.");
     onSuccess(data.publicUrl);
     showToast("ok", "Image uploaded.");
   }
 
   async function deleteMedia(path: string) {
-    const res = await fetch(`/api/admin/media?path=${encodeURIComponent(path)}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) return showToast("err", "Delete failed.");
+    const { ok, data } = await requestJson(
+      `/api/admin/media?path=${encodeURIComponent(path)}`,
+      { method: "DELETE" }
+    );
+    if (!ok) return showToast("err", data.error || "Delete failed.");
     setMediaItems(mediaItems.filter((m) => m.path !== path));
     showToast("ok", "Media deleted.");
   }
@@ -442,13 +525,18 @@ export function AdminDashboardClient({
   // Website Settings
   async function saveSettings(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/admin/settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
-    });
-    const data = await res.json();
-    if (!res.ok) return showToast("err", data.error || "Failed to save settings.");
+    if (submittingAction) return;
+    setSubmittingAction("settings");
+    const { ok, data } = await requestJson<{ settings: WebsiteSettings }>(
+      "/api/admin/settings",
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      }
+    );
+    setSubmittingAction(null);
+    if (!ok) return showToast("err", data.error || "Failed to save settings.");
     setSettings(data.settings);
     showToast("ok", "Website settings saved.");
   }
@@ -748,9 +836,10 @@ export function AdminDashboardClient({
                   </label>
                   <button
                     type="submit"
-                    className="rounded-md bg-[#244B3C] px-5 py-2 text-sm font-semibold text-[#FFFDF8] hover:bg-[#18372D]"
+                    disabled={submittingAction === "adventure"}
+                    className="rounded-md bg-[#244B3C] px-5 py-2 text-sm font-semibold text-[#FFFDF8] hover:bg-[#18372D] disabled:opacity-50"
                   >
-                    Create Activity
+                    {submittingAction === "adventure" ? "Creating..." : "Create Activity"}
                   </button>
                 </div>
               </form>
@@ -890,6 +979,26 @@ export function AdminDashboardClient({
                     onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
                     className="rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
                   />
+                  <input
+                    type="text"
+                    placeholder="End Time (e.g., 6:00 PM)"
+                    value={newEvent.end_time}
+                    onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
+                    className="rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-2 text-sm"
+                  />
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#8C735A] mb-0.5">
+                      Registration Deadline (optional)
+                    </label>
+                    <input
+                      type="date"
+                      value={newEvent.registration_deadline}
+                      onChange={(e) =>
+                        setNewEvent({ ...newEvent, registration_deadline: e.target.value })
+                      }
+                      className="w-full rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3 py-1.5 text-sm"
+                    />
+                  </div>
                   <select
                     value={newEvent.adventure_id}
                     onChange={(e) =>
@@ -977,9 +1086,10 @@ export function AdminDashboardClient({
                   </select>
                   <button
                     type="submit"
-                    className="rounded-md bg-[#244B3C] px-5 py-2 text-sm font-semibold text-[#FFFDF8] hover:bg-[#18372D]"
+                    disabled={submittingAction === "event"}
+                    className="rounded-md bg-[#244B3C] px-5 py-2 text-sm font-semibold text-[#FFFDF8] hover:bg-[#18372D] disabled:opacity-50"
                   >
-                    Create Event
+                    {submittingAction === "event" ? "Creating..." : "Create Event"}
                   </button>
                 </div>
               </form>
@@ -1078,13 +1188,16 @@ export function AdminDashboardClient({
                         <p className="text-xs text-[#262B27]/75">
                           {r.mobile} • {r.email} • {r.event?.title}
                         </p>
+                        {r.message && (
+                          <p className="text-xs text-[#262B27]/85 mt-1">Note: {r.message}</p>
+                        )}
                       </div>
                       <select
                         value={r.status}
                         onChange={(e) =>
-                          updateRegistrationStatus(
+                          updateRegistration(
                             r.id,
-                            e.target.value as RegistrationStatus,
+                            { status: e.target.value as RegistrationStatus },
                             "volunteer"
                           )
                         }
@@ -1199,9 +1312,10 @@ export function AdminDashboardClient({
                   </label>
                   <button
                     type="submit"
-                    className="rounded-md bg-[#244B3C] px-5 py-2 text-sm font-semibold text-[#FFFDF8]"
+                    disabled={submittingAction === "leader"}
+                    className="rounded-md bg-[#244B3C] px-5 py-2 text-sm font-semibold text-[#FFFDF8] disabled:opacity-50"
                   >
-                    Add Leader
+                    {submittingAction === "leader" ? "Adding..." : "Add Leader"}
                   </button>
                 </div>
               </form>
@@ -1361,13 +1475,16 @@ export function AdminDashboardClient({
                           {r.mobile} • {r.email}
                           {r.emergency_contact ? ` • Emergency: ${r.emergency_contact}` : ""}
                         </p>
+                        {r.message && (
+                          <p className="text-xs text-[#262B27]/85">Note: {r.message}</p>
+                        )}
                       </div>
                       <select
                         value={r.status}
                         onChange={(e) =>
-                          updateRegistrationStatus(
+                          updateRegistration(
                             r.id,
-                            e.target.value as RegistrationStatus
+                            { status: e.target.value as RegistrationStatus }
                           )
                         }
                         className="rounded-md border border-[#E9E9E2] px-2.5 py-1.5 text-xs"
@@ -1581,9 +1698,13 @@ export function AdminDashboardClient({
                       <div className="flex items-center justify-between gap-2">
                         <button
                           type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(m.publicUrl);
-                            showToast("ok", "Image URL copied.");
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(m.publicUrl);
+                              showToast("ok", "Image URL copied.");
+                            } catch {
+                              showToast("err", "Unable to copy URL in this browser.");
+                            }
                           }}
                           className="text-xs font-semibold text-[#244B3C] hover:underline"
                         >
@@ -1740,6 +1861,30 @@ export function AdminDashboardClient({
                     </label>
                   </div>
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#8C735A] mb-1">
+                    Tagline
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.tagline}
+                    onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
+                    className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#8C735A] mb-1">
+                    Office Location
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.office_location}
+                    onChange={(e) =>
+                      setSettings({ ...settings, office_location: e.target.value })
+                    }
+                    className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
+                  />
+                </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-[#8C735A] mb-1">
                     Hero Title
@@ -1764,6 +1909,48 @@ export function AdminDashboardClient({
                     className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#8C735A] mb-1">
+                    Footer Note
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.footer_note}
+                    onChange={(e) =>
+                      setSettings({ ...settings, footer_note: e.target.value })
+                    }
+                    className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#8C735A] mb-1">
+                    Google Analytics ID (e.g., G-XXXXXXXXXX)
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.google_analytics_id || ""}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        google_analytics_id: e.target.value || null,
+                      })
+                    }
+                    className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-[#8C735A] mb-1">
+                    SEO Default Title
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.seo_default_title}
+                    onChange={(e) =>
+                      setSettings({ ...settings, seo_default_title: e.target.value })
+                    }
+                    className="w-full rounded-md border border-[#E9E9E2] px-3 py-2 text-sm"
+                  />
+                </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-[#8C735A] mb-1">
                     SEO Default Description
@@ -1783,10 +1970,10 @@ export function AdminDashboardClient({
               </div>
               <button
                 type="submit"
-                disabled={profile.role !== "admin"}
+                disabled={profile.role !== "admin" || submittingAction === "settings"}
                 className="rounded-md bg-[#244B3C] px-6 py-2.5 text-sm font-semibold text-[#FFFDF8] disabled:opacity-50"
               >
-                Save Website Settings
+                {submittingAction === "settings" ? "Saving..." : "Save Website Settings"}
               </button>
             </form>
           )}

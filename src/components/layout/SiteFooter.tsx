@@ -211,7 +211,7 @@ export function SiteFooter({ settings }: { settings: WebsiteSettings }) {
         </div>
 
         <div className="mt-12 pt-8 border-t border-[#244B3C] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#A8B8A0]">
-          <p>
+          <p suppressHydrationWarning>
             © {new Date().getFullYear()} {settings.site_name}. All rights reserved.
           </p>
           <div className="flex items-center gap-6">

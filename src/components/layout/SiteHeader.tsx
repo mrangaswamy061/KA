@@ -25,12 +25,21 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpenPath, setMobileOpenPath] = useState<string | null>(null);
   const [treksOpenPath, setTreksOpenPath] = useState<string | null>(null);
-  const [mobileTreksOpen, setMobileTreksOpen] = useState(false);
+  const [mobileTreksOpenPath, setMobileTreksOpenPath] = useState<string | null>(null);
   const treksMenuRef = useRef<HTMLDivElement>(null);
   const hoverOpenedAtRef = useRef<number>(0);
 
   const mobileOpen = mobileOpenPath === pathname;
   const treksOpen = treksOpenPath === pathname;
+  const mobileTreksOpen = mobileTreksOpenPath === pathname;
+
+  const setMobileTreksOpen = (next: boolean | ((prev: boolean) => boolean)) => {
+    setMobileTreksOpenPath((prevPath) => {
+      const prev = prevPath === pathname;
+      const resolved = typeof next === "function" ? next(prev) : next;
+      return resolved ? pathname : null;
+    });
+  };
 
   const setMobileOpen = (next: boolean | ((prev: boolean) => boolean)) => {
     setMobileOpenPath((prevPath) => {
@@ -270,13 +279,10 @@ export function SiteHeader({ settings }: { settings: WebsiteSettings }) {
           <div className="hidden lg:flex items-center gap-4 shrink-0">
             <Link
               href="/contact"
-              className={`text-sm font-medium transition-colors ${
-                transparentOverHero
-                  ? "text-[#FFFDF8]/90 hover:text-[#FFFDF8]"
-                  : "text-[#262B27] hover:text-[#244B3C]"
-              }`}
+              className={navLinkClass(pathname === "/contact")}
             >
               Contact Us
+              {pathname === "/contact" && activeUnderline}
             </Link>
             <Link
               href="/events"

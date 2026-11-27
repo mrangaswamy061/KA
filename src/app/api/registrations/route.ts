@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { hasSupabaseConfigMismatch } from "@/lib/services/admin-auth";
 import { newUuid, readLocalDb, writeLocalDb } from "@/lib/db/local-store";
 import { registrationSchema } from "@/lib/validation/schemas";
-import { generateReferenceCode } from "@/lib/utils/format";
+import {
+  escapeHtml,
+  generateReferenceCode,
+  isDeadlinePassed,
+} from "@/lib/utils/format";
 import { sendNotificationEmail } from "@/lib/email/mailer";
 
 export async function POST(request: Request) {
@@ -17,7 +22,15 @@ export async function POST(request: Request) {
       );
     }
 
+    if (hasSupabaseConfigMismatch()) {
+      return NextResponse.json(
+        { error: "Server database configuration is incomplete." },
+        { status: 503 }
+      );
+    }
+
     const input = parsed.data;
+    const normalizedEmail = input.email.toLowerCase();
     const supabase = createAdminSupabaseClient();
 
     if (!supabase) {
@@ -32,10 +45,7 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      if (
-        event.registration_deadline &&
-        new Date(event.registration_deadline).getTime() < Date.now()
-      ) {
+      if (isDeadlinePassed(event.registration_deadline)) {
         return NextResponse.json(
           { error: "The registration deadline for this event has passed." },
           { status: 400 }
@@ -47,7 +57,7 @@ export async function POST(request: Request) {
         (r) =>
           r.event_id === input.eventId &&
           activeStatuses.includes(r.status) &&
-          (r.mobile === input.mobile || r.email.toLowerCase() === input.email.toLowerCase())
+          (r.mobile === input.mobile || r.email.toLowerCase() === normalizedEmail)
       );
       if (existing) {
         return NextResponse.json(
@@ -84,7 +94,7 @@ export async function POST(request: Request) {
         event_id: input.eventId,
         full_name: input.fullName,
         mobile: input.mobile,
-        email: input.email.toLowerCase(),
+        email: normalizedEmail,
         participants_count: input.participantsCount,
         emergency_contact: input.emergencyContact || null,
         message: input.message || null,
@@ -96,12 +106,23 @@ export async function POST(request: Request) {
       });
       writeLocalDb(db);
 
+      const safeName = escapeHtml(input.fullName);
+      const safeTitle = escapeHtml(event.title);
       const emailResult = await sendNotificationEmail({
-        to: input.email,
+        to: normalizedEmail,
         subject: `Registration Received: ${event.title} (${referenceCode})`,
         text: `Hello ${input.fullName},\n\nWe have received your registration for ${event.title} (${event.start_date}).\nReference Code: ${referenceCode}\nParticipants: ${input.participantsCount}\n\nThank you,\nKaggadu Adventures`,
-        html: `<p>Hello ${input.fullName},</p><p>We have received your registration for <strong>${event.title}</strong> (${event.start_date}).</p><p><strong>Reference Code:</strong> ${referenceCode}<br/><strong>Participants:</strong> ${input.participantsCount}</p><p>Our team will connect with you shortly.<br/>— Kaggadu Adventures</p>`,
+        html: `<p>Hello ${safeName},</p><p>We have received your registration for <strong>${safeTitle}</strong> (${escapeHtml(event.start_date)}).</p><p><strong>Reference Code:</strong> ${referenceCode}<br/><strong>Participants:</strong> ${input.participantsCount}</p><p>Our team will connect with you shortly.<br/>— Kaggadu Adventures</p>`,
       });
+
+      if (process.env.ADMIN_NOTIFICATION_EMAIL) {
+        await sendNotificationEmail({
+          to: process.env.ADMIN_NOTIFICATION_EMAIL,
+          subject: `New Event Registration: ${event.title} (${referenceCode})`,
+          text: `Name: ${input.fullName}\nMobile: ${input.mobile}\nEmail: ${normalizedEmail}\nParticipants: ${input.participantsCount}\nRef: ${referenceCode}`,
+          html: `<p><strong>New Registration</strong></p><ul><li>Event: ${safeTitle}</li><li>Ref: ${referenceCode}</li><li>Name: ${safeName}</li><li>Mobile: ${escapeHtml(input.mobile)}</li><li>Email: ${escapeHtml(normalizedEmail)}</li><li>Participants: ${input.participantsCount}</li></ul>`,
+        });
+      }
 
       return NextResponse.json(
         { success: true, referenceCode, emailSent: emailResult.sent },
@@ -127,10 +148,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      event.registration_deadline &&
-      new Date(event.registration_deadline).getTime() < Date.now()
-    ) {
+    if (isDeadlinePassed(event.registration_deadline)) {
       return NextResponse.json(
         { error: "The registration deadline for this event has passed." },
         { status: 400 }
@@ -142,7 +160,9 @@ export async function POST(request: Request) {
       .select("id, reference_code")
       .eq("event_id", input.eventId)
       .in("status", ["new", "contacted", "confirmed"])
-      .or(`mobile.eq.${input.mobile},email.eq.${input.email.toLowerCase()}`)
+      .or(
+        `mobile.eq."${input.mobile.replace(/"/g, "")}",email.eq."${normalizedEmail.replace(/"/g, "")}"`
+      )
       .limit(1)
       .maybeSingle();
 
@@ -187,7 +207,7 @@ export async function POST(request: Request) {
       event_id: input.eventId,
       full_name: input.fullName,
       mobile: input.mobile,
-      email: input.email.toLowerCase(),
+      email: normalizedEmail,
       participants_count: input.participantsCount,
       emergency_contact: input.emergencyContact || null,
       message: input.message || null,
@@ -202,19 +222,21 @@ export async function POST(request: Request) {
       );
     }
 
+    const safeName = escapeHtml(input.fullName);
+    const safeTitle = escapeHtml(event.title);
     const emailResult = await sendNotificationEmail({
-      to: input.email,
+      to: normalizedEmail,
       subject: `Registration Received: ${event.title} (${referenceCode})`,
       text: `Hello ${input.fullName},\n\nWe have received your registration for ${event.title} (${event.start_date}).\nReference Code: ${referenceCode}\nParticipants: ${input.participantsCount}\n\nThank you,\nKaggadu Adventures`,
-      html: `<p>Hello ${input.fullName},</p><p>We have received your registration for <strong>${event.title}</strong> (${event.start_date}).</p><p><strong>Reference Code:</strong> ${referenceCode}<br/><strong>Participants:</strong> ${input.participantsCount}</p><p>Our team will connect with you shortly.<br/>— Kaggadu Adventures</p>`,
+      html: `<p>Hello ${safeName},</p><p>We have received your registration for <strong>${safeTitle}</strong> (${escapeHtml(event.start_date)}).</p><p><strong>Reference Code:</strong> ${referenceCode}<br/><strong>Participants:</strong> ${input.participantsCount}</p><p>Our team will connect with you shortly.<br/>— Kaggadu Adventures</p>`,
     });
 
     if (process.env.ADMIN_NOTIFICATION_EMAIL) {
       await sendNotificationEmail({
         to: process.env.ADMIN_NOTIFICATION_EMAIL,
         subject: `New Event Registration: ${event.title} (${referenceCode})`,
-        text: `Name: ${input.fullName}\nMobile: ${input.mobile}\nEmail: ${input.email}\nParticipants: ${input.participantsCount}\nRef: ${referenceCode}`,
-        html: `<p><strong>New Registration</strong></p><ul><li>Event: ${event.title}</li><li>Ref: ${referenceCode}</li><li>Name: ${input.fullName}</li><li>Mobile: ${input.mobile}</li><li>Email: ${input.email}</li><li>Participants: ${input.participantsCount}</li></ul>`,
+        text: `Name: ${input.fullName}\nMobile: ${input.mobile}\nEmail: ${normalizedEmail}\nParticipants: ${input.participantsCount}\nRef: ${referenceCode}`,
+        html: `<p><strong>New Registration</strong></p><ul><li>Event: ${safeTitle}</li><li>Ref: ${referenceCode}</li><li>Name: ${safeName}</li><li>Mobile: ${escapeHtml(input.mobile)}</li><li>Email: ${escapeHtml(normalizedEmail)}</li><li>Participants: ${input.participantsCount}</li></ul>`,
       });
     }
 

@@ -27,7 +27,13 @@ export function EventRegistrationForm({
   const [fullName, setFullName] = useState("");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
-  const [participantsCount, setParticipantsCount] = useState(1);
+  const [participantsInput, setParticipantsInput] = useState("1");
+  const maxParticipantsAllowed = isVolunteer ? 20 : 30;
+  const parsedParticipants = Number(participantsInput);
+  const participantsCount =
+    Number.isInteger(parsedParticipants) && parsedParticipants >= 1
+      ? parsedParticipants
+      : 1;
   const [emergencyContact, setEmergencyContact] = useState("");
   const [message, setMessage] = useState("");
   const [consentAccepted, setConsentAccepted] = useState(false);
@@ -234,10 +240,18 @@ export function EventRegistrationForm({
             id="reg-count"
             type="number"
             min={1}
-            max={30}
+            max={maxParticipantsAllowed}
             required
-            value={participantsCount}
-            onChange={(e) => setParticipantsCount(Number(e.target.value) || 1)}
+            value={participantsInput}
+            onChange={(e) => setParticipantsInput(e.target.value)}
+            onBlur={() => {
+              const n = Number(participantsInput);
+              if (!Number.isInteger(n) || n < 1) {
+                setParticipantsInput("1");
+              } else if (n > maxParticipantsAllowed) {
+                setParticipantsInput(String(maxParticipantsAllowed));
+              }
+            }}
             className="w-full rounded-md border border-[#E9E9E2] bg-[#F6F4ED]/50 px-3.5 py-2.5 text-sm text-[#262B27] focus:border-[#244B3C] focus:outline-none"
           />
         </div>

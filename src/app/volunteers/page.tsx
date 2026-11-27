@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Calendar, MapPin, Leaf, ArrowRight } from "lucide-react";
 import { getPublishedEvents } from "@/lib/services/public-data";
-import { formatEventDate } from "@/lib/utils/format";
+import { formatEventDate, getIstTodayDateString } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default async function VolunteersPage() {
   const volunteerEvents = await getPublishedEvents({ category: "volunteer" });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getIstTodayDateString();
   const upcoming = volunteerEvents.filter((e) => e.start_date >= today);
   const past = volunteerEvents.filter((e) => e.start_date < today);
 

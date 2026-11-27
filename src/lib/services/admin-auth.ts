@@ -5,6 +5,10 @@ import {
 import { getLocalStaffProfile } from "@/lib/auth/local-session";
 import type { Profile } from "@/types/database";
 
+export function hasSupabaseConfigMismatch(): boolean {
+  return isSupabaseServerConfigured() && !process.env.SUPABASE_SERVICE_ROLE_KEY;
+}
+
 export async function getAuthenticatedStaffProfile(): Promise<Profile | null> {
   if (!isSupabaseServerConfigured()) {
     return getLocalStaffProfile();

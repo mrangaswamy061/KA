@@ -42,6 +42,8 @@ export function WhatsAppButton({
     );
   }
 
+  const isShortLink = url.startsWith("https://wa.me/message/");
+
   return (
     <div className="space-y-1.5">
       <a
@@ -55,7 +57,9 @@ export function WhatsAppButton({
       </a>
       {showNote && (
         <p className="text-[11px] text-[#262B27]/70 leading-snug">
-          Opens WhatsApp with a prefilled message. Please send the message in WhatsApp to complete your enquiry (this does not create an automatic online booking).
+          {isShortLink
+            ? "Opens our official WhatsApp Business chat so you can message our team directly (this does not create an automatic online booking)."
+            : "Opens WhatsApp with a prefilled message. Please send the message in WhatsApp to complete your enquiry (this does not create an automatic online booking)."}
         </p>
       )}
     </div>

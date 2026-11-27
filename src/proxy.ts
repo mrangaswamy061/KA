@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-const LOCAL_SESSION_COOKIE = "kaggadu_local_session";
+import { LOCAL_SESSION_COOKIE, verifyLocalSessionToken } from "@/lib/auth/local-token";
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -13,7 +12,8 @@ export async function proxy(request: NextRequest) {
   if (!url || !anonKey) {
     if (isAdminDashboard) {
       const localToken = request.cookies.get(LOCAL_SESSION_COOKIE)?.value;
-      if (!localToken || !localToken.includes(".")) {
+      const session = verifyLocalSessionToken(localToken);
+      if (!session) {
         const loginUrl = request.nextUrl.clone();
         loginUrl.pathname = "/admin/login";
         return NextResponse.redirect(loginUrl);

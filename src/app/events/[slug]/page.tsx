@@ -90,7 +90,9 @@ export default async function EventDetailPage({
     <div className="pt-24 pb-20 bg-[#F6F4ED]">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+        }}
       />
       <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 space-y-10">
         <Link
@@ -237,17 +239,19 @@ export default async function EventDetailPage({
               whatsappNumber={settings.whatsapp_number}
             />
 
-            <div className="rounded-xl bg-[#FFFDF8] border border-[#E9E9E2] p-6 space-y-3">
-              <h2 className="font-editorial text-lg font-semibold text-[#18372D]">
-                Prefer WhatsApp?
-              </h2>
-              <WhatsAppButton
-                whatsappNumber={settings.whatsapp_number}
-                eventName={event.title}
-                eventDate={dateLabel}
-                className="w-full"
-              />
-            </div>
+            {isOpen && (
+              <div className="rounded-xl bg-[#FFFDF8] border border-[#E9E9E2] p-6 space-y-3">
+                <h2 className="font-editorial text-lg font-semibold text-[#18372D]">
+                  Prefer WhatsApp?
+                </h2>
+                <WhatsAppButton
+                  whatsappNumber={settings.whatsapp_number}
+                  eventName={event.title}
+                  eventDate={dateLabel}
+                  className="w-full"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

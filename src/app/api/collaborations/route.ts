@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { hasSupabaseConfigMismatch } from "@/lib/services/admin-auth";
 import { newUuid, readLocalDb, writeLocalDb } from "@/lib/db/local-store";
 import { collaborationEnquirySchema } from "@/lib/validation/schemas";
+import { escapeHtml } from "@/lib/utils/format";
 import { sendNotificationEmail } from "@/lib/email/mailer";
 
 export async function POST(request: Request) {
@@ -16,7 +18,15 @@ export async function POST(request: Request) {
       );
     }
 
+    if (hasSupabaseConfigMismatch()) {
+      return NextResponse.json(
+        { error: "Server database configuration is incomplete." },
+        { status: 503 }
+      );
+    }
+
     const input = parsed.data;
+    const normalizedEmail = input.email.toLowerCase();
     const supabase = createAdminSupabaseClient();
 
     if (!supabase) {
@@ -26,7 +36,7 @@ export async function POST(request: Request) {
         id: newUuid(),
         name: input.name,
         organisation: input.organisation,
-        email: input.email.toLowerCase(),
+        email: normalizedEmail,
         mobile: input.mobile,
         collaboration_type: input.collaborationType,
         message: input.message,
@@ -36,13 +46,23 @@ export async function POST(request: Request) {
         updated_at: now,
       });
       writeLocalDb(db);
+
+      if (process.env.ADMIN_NOTIFICATION_EMAIL) {
+        await sendNotificationEmail({
+          to: process.env.ADMIN_NOTIFICATION_EMAIL,
+          subject: `New Collaboration Enquiry: ${input.organisation}`,
+          text: `Name: ${input.name}\nOrganisation: ${input.organisation}\nType: ${input.collaborationType}\nMobile: ${input.mobile}\nEmail: ${normalizedEmail}\n\n${input.message}`,
+          html: `<p><strong>Collaboration Enquiry from ${escapeHtml(input.organisation)}</strong></p><p>${escapeHtml(input.name)} (${escapeHtml(input.collaborationType)})</p><p>${escapeHtml(input.message)}</p>`,
+        });
+      }
+
       return NextResponse.json({ success: true }, { status: 201 });
     }
 
     const { error: insertErr } = await supabase.from("collaboration_enquiries").insert({
       name: input.name,
       organisation: input.organisation,
-      email: input.email.toLowerCase(),
+      email: normalizedEmail,
       mobile: input.mobile,
       collaboration_type: input.collaborationType,
       message: input.message,
@@ -60,8 +80,8 @@ export async function POST(request: Request) {
       await sendNotificationEmail({
         to: process.env.ADMIN_NOTIFICATION_EMAIL,
         subject: `New Collaboration Enquiry: ${input.organisation}`,
-        text: `Name: ${input.name}\nOrganisation: ${input.organisation}\nType: ${input.collaborationType}\nMobile: ${input.mobile}\nEmail: ${input.email}\n\n${input.message}`,
-        html: `<p><strong>Collaboration Enquiry from ${input.organisation}</strong></p><p>${input.name} (${input.collaborationType})</p><p>${input.message}</p>`,
+        text: `Name: ${input.name}\nOrganisation: ${input.organisation}\nType: ${input.collaborationType}\nMobile: ${input.mobile}\nEmail: ${normalizedEmail}\n\n${input.message}`,
+        html: `<p><strong>Collaboration Enquiry from ${escapeHtml(input.organisation)}</strong></p><p>${escapeHtml(input.name)} (${escapeHtml(input.collaborationType)})</p><p>${escapeHtml(input.message)}</p>`,
       });
     }
 

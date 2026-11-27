@@ -1,11 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { getAuthenticatedStaffProfile } from "@/lib/services/admin-auth";
+import {
+  getAuthenticatedStaffProfile,
+  hasSupabaseConfigMismatch,
+} from "@/lib/services/admin-auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { readLocalDb, writeLocalDb } from "@/lib/db/local-store";
 
 const BUCKET = "kaggadu-media";
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_INLINE_BYTES = 2.5 * 1024 * 1024;
 const ALLOWED_FOLDERS = [
   "logo",
@@ -17,6 +21,15 @@ const ALLOWED_FOLDERS = [
   "leaders",
   "general",
 ];
+
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+};
 
 function getLocalFolderDir(folder: string): string {
   return path.join(process.cwd(), "public", "uploads", folder);
@@ -39,6 +52,12 @@ function canWritePublicUploads(): boolean {
 export async function GET(request: Request) {
   const staff = await getAuthenticatedStaffProfile();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (hasSupabaseConfigMismatch()) {
+    return NextResponse.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY is not configured." },
+      { status: 503 }
+    );
+  }
 
   const { searchParams } = new URL(request.url);
   const folder = searchParams.get("folder") || "general";
@@ -86,8 +105,20 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const staff = await getAuthenticatedStaffProfile();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (hasSupabaseConfigMismatch()) {
+    return NextResponse.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY is not configured." },
+      { status: 503 }
+    );
+  }
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json({ error: "Invalid multipart form data." }, { status: 400 });
+  }
+
   const file = formData.get("file");
   const folder = String(formData.get("folder") || "general");
   const safeFolder = ALLOWED_FOLDERS.includes(folder) ? folder : "general";
@@ -96,8 +127,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No file provided." }, { status: 400 });
   }
 
-  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const mappedExt = MIME_TO_EXT[file.type.toLowerCase()];
+  const rawExt = file.name.split(".").pop()?.toLowerCase() || "";
+  const safeExt =
+    mappedExt ||
+    (["jpg", "jpeg", "png", "webp", "gif", "avif"].includes(rawExt) ? rawExt : "");
+  if (!safeExt) {
+    return NextResponse.json(
+      { error: "Only JPG, PNG, WebP, GIF, or AVIF images are allowed." },
+      { status: 400 }
+    );
+  }
+
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: "Image must be 5 MB or smaller." },
+      { status: 400 }
+    );
+  }
+
+  const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;
   const filePath = `${safeFolder}/${safeName}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -120,7 +169,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const mimeType = file.type || "image/jpeg";
+    const mimeType =
+      file.type && MIME_TO_EXT[file.type.toLowerCase()]
+        ? file.type
+        : `image/${safeExt === "jpg" ? "jpeg" : safeExt}`;
     const publicUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
     const inlinePath = `inline/${filePath}`;
     const db = readLocalDb();
@@ -139,7 +191,7 @@ export async function POST(request: Request) {
   }
 
   const { error } = await supabase.storage.from(BUCKET).upload(filePath, buffer, {
-    contentType: file.type || "image/jpeg",
+    contentType: file.type || `image/${safeExt === "jpg" ? "jpeg" : safeExt}`,
     upsert: false,
   });
 
@@ -155,10 +207,18 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const staff = await getAuthenticatedStaffProfile();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (hasSupabaseConfigMismatch()) {
+    return NextResponse.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY is not configured." },
+      { status: 503 }
+    );
+  }
 
   const { searchParams } = new URL(request.url);
   const targetPath = searchParams.get("path");
-  if (!targetPath) return NextResponse.json({ error: "File path is required." }, { status: 400 });
+  if (!targetPath || targetPath.includes("..")) {
+    return NextResponse.json({ error: "Valid file path is required." }, { status: 400 });
+  }
 
   const supabase = createAdminSupabaseClient();
   if (!supabase) {
@@ -169,9 +229,9 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    const safeResolved = path.resolve(process.cwd(), "public", "uploads", targetPath);
     const baseUploads = path.resolve(process.cwd(), "public", "uploads");
-    if (!safeResolved.startsWith(baseUploads)) {
+    const safeResolved = path.resolve(baseUploads, targetPath);
+    if (!safeResolved.startsWith(baseUploads + path.sep)) {
       return NextResponse.json({ error: "Invalid path." }, { status: 400 });
     }
     if (fs.existsSync(safeResolved)) fs.unlinkSync(safeResolved);

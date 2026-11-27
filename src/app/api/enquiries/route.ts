@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { hasSupabaseConfigMismatch } from "@/lib/services/admin-auth";
 import { newUuid, readLocalDb, writeLocalDb } from "@/lib/db/local-store";
 import { contactEnquirySchema } from "@/lib/validation/schemas";
+import { escapeHtml } from "@/lib/utils/format";
 import { sendNotificationEmail } from "@/lib/email/mailer";
 
 export async function POST(request: Request) {
@@ -16,7 +18,15 @@ export async function POST(request: Request) {
       );
     }
 
+    if (hasSupabaseConfigMismatch()) {
+      return NextResponse.json(
+        { error: "Server database configuration is incomplete." },
+        { status: 503 }
+      );
+    }
+
     const input = parsed.data;
+    const normalizedEmail = input.email.toLowerCase();
     const supabase = createAdminSupabaseClient();
 
     if (!supabase) {
@@ -25,7 +35,7 @@ export async function POST(request: Request) {
       db.enquiries.unshift({
         id: newUuid(),
         full_name: input.fullName,
-        email: input.email.toLowerCase(),
+        email: normalizedEmail,
         mobile: input.mobile,
         subject: input.subject,
         message: input.message,
@@ -35,12 +45,22 @@ export async function POST(request: Request) {
         updated_at: now,
       });
       writeLocalDb(db);
+
+      if (process.env.ADMIN_NOTIFICATION_EMAIL) {
+        await sendNotificationEmail({
+          to: process.env.ADMIN_NOTIFICATION_EMAIL,
+          subject: `New Website Enquiry: ${input.subject}`,
+          text: `From: ${input.fullName} (${input.mobile}, ${normalizedEmail})\n\n${input.message}`,
+          html: `<p><strong>New Enquiry: ${escapeHtml(input.subject)}</strong></p><p>From: ${escapeHtml(input.fullName)} (${escapeHtml(input.mobile)}, ${escapeHtml(normalizedEmail)})</p><p>${escapeHtml(input.message)}</p>`,
+        });
+      }
+
       return NextResponse.json({ success: true }, { status: 201 });
     }
 
     const { error: insertErr } = await supabase.from("enquiries").insert({
       full_name: input.fullName,
-      email: input.email.toLowerCase(),
+      email: normalizedEmail,
       mobile: input.mobile,
       subject: input.subject,
       message: input.message,
@@ -58,8 +78,8 @@ export async function POST(request: Request) {
       await sendNotificationEmail({
         to: process.env.ADMIN_NOTIFICATION_EMAIL,
         subject: `New Website Enquiry: ${input.subject}`,
-        text: `From: ${input.fullName} (${input.mobile}, ${input.email})\n\n${input.message}`,
-        html: `<p><strong>New Enquiry: ${input.subject}</strong></p><p>From: ${input.fullName} (${input.mobile}, ${input.email})</p><p>${input.message}</p>`,
+        text: `From: ${input.fullName} (${input.mobile}, ${normalizedEmail})\n\n${input.message}`,
+        html: `<p><strong>New Enquiry: ${escapeHtml(input.subject)}</strong></p><p>From: ${escapeHtml(input.fullName)} (${escapeHtml(input.mobile)}, ${escapeHtml(normalizedEmail)})</p><p>${escapeHtml(input.message)}</p>`,
       });
     }
 

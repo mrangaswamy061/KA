@@ -50,10 +50,19 @@ export function EventCalendar({ events }: { events: EventRecord[] }) {
   const eventsByDate = useMemo(() => {
     const map = new Map<string, EventRecord[]>();
     for (const ev of filteredEvents) {
-      const key = ev.start_date;
-      const list = map.get(key) || [];
-      list.push(ev);
-      map.set(key, list);
+      const start = new Date(`${ev.start_date}T00:00:00Z`);
+      const end = ev.end_date ? new Date(`${ev.end_date}T00:00:00Z`) : start;
+      if (Number.isNaN(start.getTime())) continue;
+      const effectiveEnd =
+        !Number.isNaN(end.getTime()) && end >= start ? end : start;
+      const cursor = new Date(start.getTime());
+      for (let dayOffset = 0; dayOffset < 60 && cursor <= effectiveEnd; dayOffset++) {
+        const key = cursor.toISOString().slice(0, 10);
+        const list = map.get(key) || [];
+        list.push(ev);
+        map.set(key, list);
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
     }
     return map;
   }, [filteredEvents]);
@@ -75,8 +84,13 @@ export function EventCalendar({ events }: { events: EventRecord[] }) {
     const y = currentMonth.getFullYear();
     const m = currentMonth.getMonth();
     const monthPrefix = `${y}-${String(m + 1).padStart(2, "0")}`;
-    const inMonth = filteredEvents.filter((e) => e.start_date.startsWith(monthPrefix));
-    return inMonth.length > 0 ? inMonth : filteredEvents.slice(0, 4);
+    return filteredEvents.filter((e) => {
+      if (e.start_date.startsWith(monthPrefix)) return true;
+      if (e.end_date && e.start_date <= `${monthPrefix}-31` && e.end_date >= `${monthPrefix}-01`) {
+        return true;
+      }
+      return false;
+    });
   }, [selectedDateKey, eventsByDate, currentMonth, filteredEvents]);
 
   return (
@@ -276,7 +290,7 @@ export function EventCalendar({ events }: { events: EventRecord[] }) {
                       )}
                     </div>
                     <Link
-                      href={`/events/${ev.slug}`}
+                      href={ev.category === "volunteer" ? `/volunteers/${ev.slug}` : `/events/${ev.slug}`}
                       className="inline-flex items-center gap-1 rounded-md bg-[#244B3C] px-3.5 py-1.5 text-xs font-semibold text-[#FFFDF8] hover:bg-[#18372D] transition-colors"
                     >
                       {ev.status === "published" ? "Register" : "View Details"}

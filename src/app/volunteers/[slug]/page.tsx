@@ -20,7 +20,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const result = await getPublishedEventBySlug(slug);
-  if (!result) return { title: "Volunteer Event Not Found" };
+  if (!result || result.event.category !== "volunteer") {
+    return { title: "Volunteer Event Not Found" };
+  }
 
   return {
     title: result.event.title,
@@ -40,7 +42,7 @@ export default async function VolunteerDetailPage({
     getWebsiteSettings(),
   ]);
 
-  if (!result) notFound();
+  if (!result || result.event.category !== "volunteer") notFound();
 
   const { event } = result;
   const dateLabel = formatEventDate(event.start_date, event.end_date);
@@ -100,14 +102,16 @@ export default async function VolunteerDetailPage({
               statusLabel={event.status.replace(/_/g, " ")}
               whatsappNumber={settings.whatsapp_number}
             />
-            <div className="rounded-xl bg-[#FFFDF8] border border-[#E9E9E2] p-6">
-              <WhatsAppButton
-                whatsappNumber={settings.whatsapp_number}
-                eventName={event.title}
-                eventDate={dateLabel}
-                className="w-full"
-              />
-            </div>
+            {isOpen && (
+              <div className="rounded-xl bg-[#FFFDF8] border border-[#E9E9E2] p-6">
+                <WhatsAppButton
+                  whatsappNumber={settings.whatsapp_number}
+                  eventName={event.title}
+                  eventDate={dateLabel}
+                  className="w-full"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

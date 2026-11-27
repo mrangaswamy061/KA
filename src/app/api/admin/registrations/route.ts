@@ -1,11 +1,29 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedStaffProfile } from "@/lib/services/admin-auth";
+import {
+  getAuthenticatedStaffProfile,
+  hasSupabaseConfigMismatch,
+} from "@/lib/services/admin-auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { readLocalDb, writeLocalDb } from "@/lib/db/local-store";
+import type { RegistrationStatus } from "@/types/database";
+
+const VALID_STATUSES: RegistrationStatus[] = [
+  "new",
+  "contacted",
+  "confirmed",
+  "cancelled",
+  "completed",
+];
 
 export async function GET(request: Request) {
   const staff = await getAuthenticatedStaffProfile();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (hasSupabaseConfigMismatch()) {
+    return NextResponse.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY is not configured." },
+      { status: 503 }
+    );
+  }
 
   const { searchParams } = new URL(request.url);
   const isVolunteer = searchParams.get("type") === "volunteer";
@@ -33,9 +51,27 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   const staff = await getAuthenticatedStaffProfile();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (hasSupabaseConfigMismatch()) {
+    return NextResponse.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY is not configured." },
+      { status: 503 }
+    );
+  }
 
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+  }
+
   if (!body.id) return NextResponse.json({ error: "ID is required." }, { status: 400 });
+  if (
+    "status" in body &&
+    !VALID_STATUSES.includes(body.status as RegistrationStatus)
+  ) {
+    return NextResponse.json({ error: "Invalid registration status." }, { status: 400 });
+  }
 
   const isVolunteer = body.type === "volunteer";
   const supabase = createAdminSupabaseClient();
@@ -45,8 +81,13 @@ export async function PATCH(request: Request) {
     const list = isVolunteer ? db.volunteer_registrations : db.registrations;
     const idx = list.findIndex((r) => r.id === body.id);
     if (idx === -1) return NextResponse.json({ error: "Not found." }, { status: 404 });
-    if ("status" in body) list[idx].status = body.status;
-    if ("internal_notes" in body) list[idx].internal_notes = body.internal_notes;
+    if ("status" in body) list[idx].status = body.status as RegistrationStatus;
+    if ("internal_notes" in body) {
+      list[idx].internal_notes =
+        body.internal_notes === "" || body.internal_notes === null
+          ? null
+          : String(body.internal_notes);
+    }
     list[idx].updated_at = new Date().toISOString();
     writeLocalDb(db);
     return NextResponse.json({ item: list[idx] });
@@ -55,7 +96,12 @@ export async function PATCH(request: Request) {
   const table = isVolunteer ? "volunteer_registrations" : "registrations";
   const updates: Record<string, unknown> = {};
   if ("status" in body) updates.status = body.status;
-  if ("internal_notes" in body) updates.internal_notes = body.internal_notes;
+  if ("internal_notes" in body) {
+    updates.internal_notes =
+      body.internal_notes === "" || body.internal_notes === null
+        ? null
+        : String(body.internal_notes);
+  }
 
   const { data, error } = await supabase
     .from(table)

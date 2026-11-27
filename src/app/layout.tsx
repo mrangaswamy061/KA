@@ -55,11 +55,13 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const settings = await getWebsiteSettings();
-  const gaId = settings.google_analytics_id;
+  const rawGaId = settings.google_analytics_id?.trim() || "";
+  const gaId = /^(G|GT|UA|AW)-[A-Z0-9-]+$/i.test(rawGaId) ? rawGaId : null;
 
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${playfair.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#F6F4ED] text-[#262B27]">

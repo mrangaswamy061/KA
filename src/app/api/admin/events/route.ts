@@ -1,12 +1,46 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedStaffProfile } from "@/lib/services/admin-auth";
+import { revalidatePath } from "next/cache";
+import {
+  getAuthenticatedStaffProfile,
+  hasSupabaseConfigMismatch,
+} from "@/lib/services/admin-auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { newUuid, readLocalDb, writeLocalDb } from "@/lib/db/local-store";
-import { slugify } from "@/lib/utils/format";
+import { parseOptionalNumber, safeSlug } from "@/lib/utils/format";
+import type { EventCategory, EventStatus } from "@/types/database";
+
+const DIRECT_STRING_FIELDS = [
+  "category",
+  "title",
+  "slug",
+  "short_description",
+  "description",
+  "location",
+  "start_date",
+  "status",
+] as const;
+
+const NULLABLE_FIELDS = [
+  "adventure_id",
+  "map_url",
+  "end_date",
+  "start_time",
+  "end_time",
+  "registration_deadline",
+  "registration_instructions",
+  "cover_image_url",
+  "cover_image_alt",
+] as const;
 
 export async function GET() {
   const staff = await getAuthenticatedStaffProfile();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (hasSupabaseConfigMismatch()) {
+    return NextResponse.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY is not configured." },
+      { status: 503 }
+    );
+  }
 
   const supabase = createAdminSupabaseClient();
   if (!supabase) {
@@ -27,27 +61,34 @@ export async function GET() {
 export async function POST(request: Request) {
   const staff = await getAuthenticatedStaffProfile();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (hasSupabaseConfigMismatch()) {
+    return NextResponse.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY is not configured." },
+      { status: 503 }
+    );
+  }
 
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+  }
+
   const title = String(body.title || "").trim();
-  if (!title || !body.start_date) {
+  const startDate = String(body.start_date || "").trim();
+  if (!title || !startDate) {
     return NextResponse.json(
       { error: "Title and start date are required." },
       { status: 400 }
     );
   }
 
-  const slug = body.slug ? slugify(body.slug) : `${slugify(title)}-${body.start_date}`;
-  const price =
-    body.price !== "" && body.price !== null && body.price !== undefined
-      ? Number(body.price)
-      : null;
-  const maxParticipants =
-    body.max_participants !== "" &&
-    body.max_participants !== null &&
-    body.max_participants !== undefined
-      ? Number(body.max_participants)
-      : null;
+  const baseSlug = safeSlug(body.slug, `${title}-${startDate}`);
+  const price = parseOptionalNumber(body.price);
+  const maxParticipants = parseOptionalNumber(body.max_participants);
+  const latitude = parseOptionalNumber(body.latitude);
+  const longitude = parseOptionalNumber(body.longitude);
 
   const supabase = createAdminSupabaseClient();
   if (!supabase) {
@@ -55,42 +96,47 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const item = {
       id: newUuid(),
-      adventure_id: body.adventure_id || null,
-      category: body.category || "trek",
+      adventure_id: (body.adventure_id as string) || null,
+      category: (body.category as EventCategory) || "trek",
       title,
-      slug: db.events.some((e) => e.slug === slug)
-        ? `${slug}-${Date.now().toString(36)}`
-        : slug,
-      short_description: body.short_description || "",
-      description: body.description || "",
-      location: body.location || "",
-      map_url: body.map_url || null,
-      latitude:
-        body.latitude !== "" && body.latitude !== null && body.latitude !== undefined
-          ? Number(body.latitude)
-          : null,
-      longitude:
-        body.longitude !== "" && body.longitude !== null && body.longitude !== undefined
-          ? Number(body.longitude)
-          : null,
-      start_date: body.start_date,
-      end_date: body.end_date || null,
-      start_time: body.start_time || null,
-      end_time: body.end_time || null,
+      slug: db.events.some((e) => e.slug === baseSlug)
+        ? `${baseSlug}-${Date.now().toString(36)}`
+        : baseSlug,
+      short_description: String(body.short_description || ""),
+      description: String(body.description || ""),
+      location: String(body.location || ""),
+      map_url: (body.map_url as string) || null,
+      latitude,
+      longitude,
+      start_date: startDate,
+      end_date: (body.end_date as string) || null,
+      start_time: (body.start_time as string) || null,
+      end_time: (body.end_time as string) || null,
       price,
       max_participants: maxParticipants,
-      registration_deadline: body.registration_deadline || null,
-      status: body.status || "draft",
-      registration_instructions: body.registration_instructions || null,
-      cover_image_url: body.cover_image_url || null,
-      cover_image_alt: body.cover_image_alt || null,
+      registration_deadline: (body.registration_deadline as string) || null,
+      status: (body.status as EventStatus) || "draft",
+      registration_instructions: (body.registration_instructions as string) || null,
+      cover_image_url: (body.cover_image_url as string) || null,
+      cover_image_alt: (body.cover_image_alt as string) || null,
       created_at: now,
       updated_at: now,
     };
     db.events.push(item);
     writeLocalDb(db);
+    revalidatePath("/", "layout");
     return NextResponse.json({ item }, { status: 201 });
   }
+
+  const { data: existingSlug } = await supabase
+    .from("events")
+    .select("id")
+    .eq("slug", baseSlug)
+    .maybeSingle();
+
+  const finalSlug = existingSlug
+    ? `${baseSlug}-${Date.now().toString(36)}`
+    : baseSlug;
 
   const { data, error } = await supabase
     .from("events")
@@ -98,20 +144,14 @@ export async function POST(request: Request) {
       adventure_id: body.adventure_id || null,
       category: body.category || "trek",
       title,
-      slug,
+      slug: finalSlug,
       short_description: body.short_description || "",
       description: body.description || "",
       location: body.location || "",
       map_url: body.map_url || null,
-      latitude:
-        body.latitude !== "" && body.latitude !== null && body.latitude !== undefined
-          ? Number(body.latitude)
-          : null,
-      longitude:
-        body.longitude !== "" && body.longitude !== null && body.longitude !== undefined
-          ? Number(body.longitude)
-          : null,
-      start_date: body.start_date,
+      latitude,
+      longitude,
+      start_date: startDate,
       end_date: body.end_date || null,
       start_time: body.start_time || null,
       end_time: body.end_time || null,
@@ -127,15 +167,44 @@ export async function POST(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  revalidatePath("/", "layout");
   return NextResponse.json({ item: data }, { status: 201 });
 }
 
 export async function PATCH(request: Request) {
   const staff = await getAuthenticatedStaffProfile();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (hasSupabaseConfigMismatch()) {
+    return NextResponse.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY is not configured." },
+      { status: 503 }
+    );
+  }
 
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+  }
+
   if (!body.id) return NextResponse.json({ error: "Event ID is required." }, { status: 400 });
+
+  const updates: Record<string, unknown> = {};
+  for (const key of DIRECT_STRING_FIELDS) {
+    if (key in body) updates[key] = String(body[key] ?? "");
+  }
+  for (const key of NULLABLE_FIELDS) {
+    if (key in body) updates[key] = body[key] === "" ? null : body[key];
+  }
+  for (const numKey of ["price", "max_participants", "latitude", "longitude"] as const) {
+    if (numKey in body) {
+      updates[numKey] = parseOptionalNumber(body[numKey]);
+    }
+  }
+  if ("slug" in updates) {
+    updates.slug = safeSlug(updates.slug, String(updates.title || "event"));
+  }
 
   const supabase = createAdminSupabaseClient();
   if (!supabase) {
@@ -144,43 +213,12 @@ export async function PATCH(request: Request) {
     if (idx === -1) return NextResponse.json({ error: "Not found." }, { status: 404 });
     db.events[idx] = {
       ...db.events[idx],
-      ...body,
+      ...updates,
       updated_at: new Date().toISOString(),
     };
     writeLocalDb(db);
+    revalidatePath("/", "layout");
     return NextResponse.json({ item: db.events[idx] });
-  }
-
-  const updates: Record<string, unknown> = {};
-  const directFields = [
-    "adventure_id",
-    "category",
-    "title",
-    "slug",
-    "short_description",
-    "description",
-    "location",
-    "map_url",
-    "start_date",
-    "end_date",
-    "start_time",
-    "end_time",
-    "registration_deadline",
-    "status",
-    "registration_instructions",
-    "cover_image_url",
-    "cover_image_alt",
-  ];
-  for (const key of directFields) {
-    if (key in body) updates[key] = body[key] === "" ? null : body[key];
-  }
-  for (const numKey of ["price", "max_participants", "latitude", "longitude"]) {
-    if (numKey in body) {
-      updates[numKey] =
-        body[numKey] !== "" && body[numKey] !== null && body[numKey] !== undefined
-          ? Number(body[numKey])
-          : null;
-    }
   }
 
   const { data, error } = await supabase
@@ -191,12 +229,19 @@ export async function PATCH(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  revalidatePath("/", "layout");
   return NextResponse.json({ item: data });
 }
 
 export async function DELETE(request: Request) {
   const staff = await getAuthenticatedStaffProfile();
   if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (hasSupabaseConfigMismatch()) {
+    return NextResponse.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY is not configured." },
+      { status: 503 }
+    );
+  }
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
@@ -205,12 +250,23 @@ export async function DELETE(request: Request) {
   const supabase = createAdminSupabaseClient();
   if (!supabase) {
     const db = readLocalDb();
+    const hasLinkedRegs =
+      db.registrations.some((r) => r.event_id === id) ||
+      db.volunteer_registrations.some((r) => r.event_id === id);
+    if (hasLinkedRegs) {
+      return NextResponse.json(
+        { error: "Cannot delete event with existing registrations." },
+        { status: 409 }
+      );
+    }
     db.events = db.events.filter((e) => e.id !== id);
     writeLocalDb(db);
+    revalidatePath("/", "layout");
     return NextResponse.json({ success: true });
   }
 
   const { error } = await supabase.from("events").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  revalidatePath("/", "layout");
   return NextResponse.json({ success: true });
 }
