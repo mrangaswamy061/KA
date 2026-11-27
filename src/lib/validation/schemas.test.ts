@@ -19,6 +19,7 @@ import {
   signLocalSessionToken,
   verifyLocalSessionToken,
 } from "../auth/local-token.ts";
+import { hasSupabaseAdminKey } from "../supabase/admin.ts";
 
 test("normalizeIndianMobile handles +91 and 0 prefixes", () => {
   assert.equal(normalizeIndianMobile("+91 98765 43210"), "9876543210");
@@ -97,4 +98,26 @@ test("signLocalSessionToken and verifyLocalSessionToken reject forged tokens", (
   assert.equal(verified?.email, "admin@example.com");
   assert.equal(verifyLocalSessionToken("forged.token"), null);
   assert.equal(verifyLocalSessionToken(undefined), null);
+});
+
+test("hasSupabaseAdminKey accepts both SUPABASE_SECRET_KEY and SUPABASE_SERVICE_ROLE_KEY", () => {
+  const prevSecret = process.env.SUPABASE_SECRET_KEY;
+  const prevService = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  try {
+    delete process.env.SUPABASE_SECRET_KEY;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    assert.equal(hasSupabaseAdminKey(), false);
+
+    process.env.SUPABASE_SECRET_KEY = "sb_secret_test";
+    assert.equal(hasSupabaseAdminKey(), true);
+
+    delete process.env.SUPABASE_SECRET_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service_role_test";
+    assert.equal(hasSupabaseAdminKey(), true);
+  } finally {
+    if (prevSecret === undefined) delete process.env.SUPABASE_SECRET_KEY;
+    else process.env.SUPABASE_SECRET_KEY = prevSecret;
+    if (prevService === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = prevService;
+  }
 });

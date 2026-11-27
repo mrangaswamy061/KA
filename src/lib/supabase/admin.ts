@@ -1,12 +1,19 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Server-only Supabase admin client using SUPABASE_SERVICE_ROLE_KEY.
+ * Server-only Supabase admin client using SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY.
  * NEVER import this module in client components.
  */
+export function hasSupabaseAdminKey(): boolean {
+  return Boolean(
+    process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
+
 export function createAdminSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey =
+    process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceRoleKey) {
     return null;

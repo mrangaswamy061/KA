@@ -2,11 +2,12 @@ import {
   createServerSupabaseClient,
   isSupabaseServerConfigured,
 } from "@/lib/supabase/server";
+import { hasSupabaseAdminKey } from "@/lib/supabase/admin";
 import { getLocalStaffProfile } from "@/lib/auth/local-session";
 import type { Profile } from "@/types/database";
 
 export function hasSupabaseConfigMismatch(): boolean {
-  return isSupabaseServerConfigured() && !process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return isSupabaseServerConfigured() && !hasSupabaseAdminKey();
 }
 
 export async function getAuthenticatedStaffProfile(): Promise<Profile | null> {
